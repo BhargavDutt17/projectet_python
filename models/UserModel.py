@@ -1,35 +1,37 @@
-from pydantic import BaseModel, Field
-import bcrypt
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Optional, Dict, Any
+from bson import ObjectId
+import bcrypt
 
 class User(BaseModel):
+    firstName: str
+    lastName: str
     username: str
-    email: str
+    email: EmailStr
     password: str
-    inviteCode: Optional[str] = None  # ✅ Invite code is now optional
-    role_id: Optional[str] = None
+    inviteCode: Optional[str] = ""
+    role_id: str = ""
     status: str = "active"
-
-    def hash_password(self):
-        """Hashes the user's password before saving it to the database."""
-        self.password = bcrypt.hashpw(self.password.encode(), bcrypt.gensalt()).decode()
+    
+    @validator("password", pre=True, always=True)
+    def encrypt_password(cls, v):
+        return bcrypt.hashpw(v.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 class UserOut(User):
     id: str = Field(alias="_id")
-    role: Optional[Dict[str, Any]] = None  # Store role details
+    role: Optional[Dict[str, Any]] = None
+    password: Optional[str] = None
+    
+    @validator("id", pre=True, always=True)
+    def convert_objectId(cls, v):
+        return str(v) if isinstance(v, ObjectId) else v
+    
+    @validator("role", pre=True, always=True)
+    def convert_role(cls, v):
+        if isinstance(v, dict) and "_id" in v:
+            v["_id"] = str(v["_id"])
+        return v
 
-    @classmethod
-    def from_mongo(cls, data):
-        """Converts MongoDB ObjectId to string and returns UserOut instance."""
-        data["id"] = str(data["_id"])
-        data["role_id"] = str(data["role_id"])
-        
-        if "role" in data and isinstance(data["role"], dict):
-            data["role"]["_id"] = str(data["role"]["_id"])  # Convert role ID to string
-        
-        return cls(**data)
-
-# ✅ Add UserLogin model
 class UserLogin(BaseModel):
-    email: str
-    password: str
+    email:str
+    password:str 
