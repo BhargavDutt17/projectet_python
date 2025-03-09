@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routes.RoleRoutes import router as role_router
+from routes.UserRoutes import router as user_router
+from routes.CategoryRoutes import router as category_router
+from routes.SubCategoryRoutes import router as sub_category_router
 
 app = FastAPI()
 
-# ✅ Enable CORS for React frontend (localhost:5173)
+# Enable CORS for React frontend (localhost:5173)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins (for testing, change to ["http://localhost:5173"] for production)
@@ -12,9 +16,9 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# ✅ Import and include your API routes AFTER applying CORS middleware
-from routes.UserRoutes import router as user_router
-app.include_router(user_router)
+# Import and include your API routes AFTER applying CORS middleware
 
-from routes.RoleRoutes import router as role_router
+app.include_router(user_router)
 app.include_router(role_router)
+app.include_router(category_router)
+app.include_router(sub_category_router)
