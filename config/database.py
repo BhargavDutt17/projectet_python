@@ -10,4 +10,5 @@ role_collection = db["roles"]
 user_collection = db["users"]
 category_collection = db["categories"]
 sub_category_collection = db["sub_categories"]
+transaction_collection = db["transaction"]
 
