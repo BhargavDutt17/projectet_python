@@ -4,6 +4,7 @@ from config.database import user_collection, role_collection
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 import bcrypt
+from utils.SendMail import send_mail
 
 # Temporary admin invite code (change/remove when proper role assignment is implemented)
 ADMIN_INVITE_CODE = "ADMIN123"
@@ -21,6 +22,7 @@ async def addUser(user: User):
     user.role_id = ObjectId(role["_id"])  # Convert role ID to ObjectId
     
     result = await user_collection.insert_one(user.dict())
+    send_mail(user.email,"User Created","User created successfully")
     return JSONResponse(status_code=201, content={"message": "User created successfully"})
 
 async def getAllUsers():
