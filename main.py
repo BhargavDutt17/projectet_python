@@ -16,9 +16,9 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Import and include your API routes AFTER applying CORS middleware
-
+# Register API routes
 app.include_router(user_router)
 app.include_router(role_router)
 app.include_router(category_router)
 app.include_router(sub_category_router)
+
