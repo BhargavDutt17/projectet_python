@@ -1,46 +1,77 @@
-from models.SubCategoryModel import SubCategory, SubCategoryOut
+from models.SubCategoryModel import SubCategory,SubCategoryOut
 from bson import ObjectId
-from config.database import sub_category_collection, category_collection
+from config.database import sub_category_collection,category_collection,user_collection,role_collection
+from fastapi import APIRouter,HTTPException
 from fastapi.responses import JSONResponse
-from fastapi import HTTPException
 
-async def addSubCategory(sub_category: SubCategory, user_id: str, user_role: str):
-    sub_category_dict = sub_category.dict()
-    sub_category_dict["created_by"] = {"user_id": user_id, "role": user_role}  # Store as a dictionary
-
-    savedCategory = await sub_category_collection.insert_one(sub_category_dict)
-    return JSONResponse(content={"message": "SubCategory saved successfully!"}, status_code=201)
-
-async def getSubCategoriesByUser(user_id: str, user_role: str):
-    if user_role == "admin":
-        subCategories = await sub_category_collection.find().to_list(None)
-    else:
-        subCategories = await sub_category_collection.find(
-            {"$or": [{"created_by": None}, {"created_by.user_id": user_id}]}
-        ).to_list(None)
-    return [SubCategoryOut(**subCat) for subCat in subCategories]  
+async def addSubCategory(sub_category:SubCategory):
+    savedCategory = await sub_category_collection.insert_one(sub_category.dict())
+    return JSONResponse(content={"message":"SubCategory saved successfully!!"},status_code=201)
 
 async def getAllSubCategories():
-    subCategories = await sub_category_collection.find().to_list(None)
+    subCategories = await sub_category_collection.find().to_list()
+    
     for subCat in subCategories:
-        if "category_id" in subCat and isinstance(subCat["category_id"], ObjectId):
+        if "user_id" in subCat and isinstance(subCat["user_id"],ObjectId):
+            subCat["user_id"] = str(subCat["user_id"])
+        
+        user = await user_collection.find_one({"_id":ObjectId(subCat["user_id"])})
+        if user:
+            user["_id"] = str(user["_id"])
+            subCat["user_id"] = user   
+
+
+        if "category_id" in subCat and isinstance(subCat["category_id"],ObjectId):
             subCat["category_id"] = str(subCat["category_id"])
+        
+        category = await category_collection.find_one({"_id":ObjectId(subCat["category_id"])})
+        if category:
+            category["_id"] = str(category["_id"])
+            subCat["category_id"] = category  
+
+
+        if "role_id" in subCat and isinstance(subCat["role_id"],ObjectId):
+            subCat["role_id"] = str(subCat["role_id"])
+        
+        role = await role_collection.find_one({"_id":ObjectId(subCat["role_id"])})
+        if role:
+            role["_id"] = str(role["_id"])
+            subCat["role_id"] = role
+        
     
     return [SubCategoryOut(**subCat) for subCat in subCategories]        
+            
 
-async def getSubCategoryByCategoryId(category_id: str):
-    try:
-        category_obj_id = ObjectId(category_id)  # Convert to ObjectId
-    except:
-        raise HTTPException(status_code=400, detail="Invalid category_id format")
-
-    subCategories = await sub_category_collection.find({"category_id": category_obj_id}).to_list(None)
-
+async def getSubCategoryByCategoryId(category_id:str):
+    subCategories = await sub_category_collection.find({"category_id":category_id}).to_list()
+    
     for subCat in subCategories:
-        if "_id" in subCat and isinstance(subCat["_id"], ObjectId):
-            subCat["_id"] = str(subCat["_id"])  # Convert ObjectId to string
+        if "user_id" in subCat and isinstance(subCat["user_id"],ObjectId):
+            subCat["user_id"] = str(subCat["user_id"])
+        
+        user = await user_collection.find_one({"_id":ObjectId(subCat["user_id"])})
+        if user:
+            user["_id"] = str(user["_id"])
+            subCat["user_id"] = user   
 
-        if "category_id" in subCat and isinstance(subCat["category_id"], ObjectId):
+
+        if "category_id" in subCat and isinstance(subCat["category_id"],ObjectId):
             subCat["category_id"] = str(subCat["category_id"])
+        
+        category = await category_collection.find_one({"_id":ObjectId(subCat["category_id"])})
+        if category:
+            category["_id"] = str(category["_id"])
+            subCat["category_id"] = category  
 
-    return [SubCategoryOut(**subCat) for subCat in subCategories]
+
+        if "role_id" in subCat and isinstance(subCat["role_id"],ObjectId):
+            subCat["role_id"] = str(subCat["role_id"])
+        
+        role = await role_collection.find_one({"_id":ObjectId(subCat["role_id"])})
+        if role:
+            role["_id"] = str(role["_id"])
+            subCat["role_id"] = role
+        
+    
+    return [SubCategoryOut(**subCat) for subCat in subCategories]        
+            

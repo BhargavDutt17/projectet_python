@@ -1,17 +1,17 @@
 from fastapi import APIRouter
 from models.TransactionModel import Transaction
-from controllers.TransactionController import addTransaction, getAllTransactions, getTransactionsByUser
+from controllers import TransactionController
 
 router = APIRouter()
 
-@router.post("/addTransaction", tags=["Transaction"])
+@router.post("/addTransaction")
 async def post_transaction(transaction: Transaction):
-    return await addTransaction(transaction)
+    return await TransactionController.addTransaction(transaction)
 
-@router.get("/getAllTransactions", tags=["Transaction"])
+@router.get("/getAllTransactions")
 async def get_all_transactions():
-    return await getAllTransactions()
+    return await TransactionController.getAllTransactions()
 
-@router.get("/getTransactionsByUser/{user_id}", tags=["Transaction"])
-async def get_transactions_by_user(user_id: str):
-    return await getTransactionsByUser(user_id)
+@router.get("/getTransactionByUserId/{user_id}")
+async def get_transaction_by_user_id(user_id:str):
+    return await TransactionController.getTransactionByUserId(user_id)

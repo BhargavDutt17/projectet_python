@@ -1,49 +1,96 @@
 from models.TransactionModel import Transaction, TransactionOut
+from models.CategoryModel import CategoryOut
 from bson import ObjectId
-from config.database import transaction_collection, category_collection, sub_category_collection
-from fastapi.responses import JSONResponse
+from config.database import user_collection, transactions_collection, category_collection,role_collection ,sub_category_collection
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
+
 
 async def addTransaction(transaction: Transaction):
-    transaction_dict = transaction.dict()
+    saved_transaction = await transactions_collection.insert_one(transaction.dict())
+    return JSONResponse(content={"message": "Transaction saved successfully!!"}, status_code=201)
 
-    # Fetch category details using category_id
-    category = await category_collection.find_one({"_id": ObjectId(transaction.category_id)})
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
-
-    # Fetch subcategory details using subcategory_id
-    subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction.subcategory_id)})
-    if not subcategory:
-        raise HTTPException(status_code=404, detail="Subcategory not found")
-
-    # Store category & subcategory details
-    transaction_dict["category"] = category
-    transaction_dict["subcategory"] = subcategory
-
-    savedTransaction = await transaction_collection.insert_one(transaction_dict)
-    return JSONResponse(content={"message": "Transaction saved successfully!"}, status_code=201)
 
 async def getAllTransactions():
-    transactions = await transaction_collection.find().to_list(None)
+    Transactions = await transactions_collection.find().to_list()
+    print(Transactions)
 
-    for txn in transactions:
-        if "category_id" in txn and isinstance(txn["category_id"], ObjectId):
-            txn["category_id"] = str(txn["category_id"])
+    for transaction in Transactions:
 
-        if "subcategory_id" in txn and isinstance(txn["subcategory_id"], ObjectId):
-            txn["subcategory_id"] = str(txn["subcategory_id"])
+        if "user_id" in transaction and isinstance(transaction["user_id"], ObjectId):
+            transaction["user_id"] = str(transaction["user_id"])
 
-    return [TransactionOut(**txn) for txn in transactions]
+        user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
+        if user:
+            user["_id"] = str(user["_id"])
+            transaction["user_id"] = user
 
-async def getTransactionsByUser(user_id: str):
-    transactions = await transaction_collection.find({"created_by.user_id": user_id}).to_list(None)
+        if "role_id" in transaction and isinstance(transaction["role_id"], ObjectId):
+            transaction["role_id"] = str(transaction["role_id"])
 
-    for txn in transactions:
-        if "category_id" in txn and isinstance(txn["category_id"], ObjectId):
-            txn["category_id"] = str(txn["category_id"])
+        role = await role_collection.find_one({"_id": ObjectId(transaction["role_id"])})
+        if role:
+            role["_id"] = str(role["_id"])
+            transaction["role_id"] = role
 
-        if "subcategory_id" in txn and isinstance(txn["subcategory_id"], ObjectId):
-            txn["subcategory_id"] = str(txn["subcategory_id"])
+        if "category_id" in transaction and isinstance(transaction["category_id"], ObjectId):
+            transaction["category_id"] = str(transaction["category_id"])
 
-    return [TransactionOut(**txn) for txn in transactions]
+        category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
+        if category:
+            category["_id"] = str(category["_id"])
+            transaction["category_id"] = category
+
+
+        if "subcategory_id" in transaction and isinstance(transaction["subcategory_id"], ObjectId):
+            transaction["subcategory_id"] = str(transaction["subcategory_id"])
+
+        subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction["subcategory_id"])})
+        if subcategory:
+            subcategory["_id"] = str(subcategory["_id"])
+            transaction["subcategory_id"] = subcategory
+            
+
+    return [TransactionOut(**transaction) for transaction in Transactions]
+
+
+async def getTransactionByUserId(user_id:str):
+    Transactions = await transactions_collection.find({"user_id":user_id}).to_list()
+    print(Transactions)
+
+    for transaction in Transactions:
+
+        if "user_id" in transaction and isinstance(transaction["user_id"], ObjectId):
+            transaction["user_id"] = str(transaction["user_id"])
+
+        user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
+        if user:
+            user["_id"] = str(user["_id"])
+            transaction["user_id"] = user
+
+        if "role_id" in transaction and isinstance(transaction["role_id"], ObjectId):
+            transaction["role_id"] = str(transaction["role_id"])
+
+        role = await role_collection.find_one({"_id": ObjectId(transaction["role_id"])})
+        if role:
+            role["_id"] = str(role["_id"])
+            transaction["role_id"] = role
+
+        if "category_id" in transaction and isinstance(transaction["category_id"], ObjectId):
+            transaction["category_id"] = str(transaction["category_id"])
+
+        category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
+        if category:
+            category["_id"] = str(category["_id"])
+            transaction["category_id"] = category
+
+
+        if "subcategory_id" in transaction and isinstance(transaction["subcategory_id"], ObjectId):
+            transaction["subcategory_id"] = str(transaction["subcategory_id"])
+
+        subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction["subcategory_id"])})
+        if subcategory:
+            subcategory["_id"] = str(subcategory["_id"])
+            transaction["subcategory_id"] = subcategory
+
+    return [TransactionOut(**transaction) for transaction in Transactions]
