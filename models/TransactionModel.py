@@ -52,7 +52,12 @@ class TransactionOut(Transaction):
 
     @validator('subcategory_id', pre=True, always=True)
     def convert_subcategoryId(cls,v):
-        if isinstance(v,Dict) and "_id" in v:
-            v["_id"] = str(v["_id"])
-        return v
+        if isinstance(v, ObjectId):
+            return str(v)
+        
+        if isinstance(v, Dict):
+            for key, value in v.items():
+                if isinstance(value, ObjectId):
+                    v[key] = str(value)
+            return v
         
