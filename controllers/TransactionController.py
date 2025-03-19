@@ -1,96 +1,132 @@
 from models.TransactionModel import Transaction, TransactionOut
-from models.CategoryModel import CategoryOut
 from bson import ObjectId
-from config.database import user_collection, transactions_collection, category_collection,role_collection ,sub_category_collection
+from config.database import (
+    user_collection,
+    transactions_collection,
+    category_collection,
+    sub_category_collection,
+)
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
+from controllers.TransactionReportController import (
+    generate_transaction_report,
+    get_transaction_report,
+)
+from datetime import datetime
 
 
+# Function to convert ObjectId fields safely
+def convert_objectid_to_str(data):
+    """Recursively converts ObjectId fields to strings."""
+    if isinstance(data, ObjectId):
+        return str(data)
+    elif isinstance(data, dict):
+        return {k: convert_objectid_to_str(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_objectid_to_str(i) for i in data]
+    return data
+
+
+# Add Transaction (Only `_id` as ObjectId, Other IDs as String)
 async def addTransaction(transaction: Transaction):
-    saved_transaction = await transactions_collection.insert_one(transaction.dict())
-    return JSONResponse(content={"message": "Transaction saved successfully!!"}, status_code=201)
+    try:
+        transaction_dict = transaction.dict()
+
+        # Store _id as ObjectId (Only for Transaction ID)
+        transaction_dict["_id"] = ObjectId()
+
+        # Keep user_id, category_id, and subcategory_id as strings
+        transaction_dict["user_id"] = str(transaction_dict["user_id"])
+        transaction_dict["category_id"] = str(transaction_dict["category_id"])
+        transaction_dict["subcategory_id"] = str(transaction_dict["subcategory_id"])
+
+        # Convert date format to "DD/MM/YYYY" before storing
+        try:
+            transaction_dict["date"] = datetime.strptime(transaction_dict["date"], "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            pass  # If already in correct format, keep as is
+
+        await transactions_collection.insert_one(transaction_dict)
+        return JSONResponse(content={"message": "Transaction saved successfully!!"}, status_code=201)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error adding transaction: {str(e)}")
 
 
+# Get All Transactions (Follow ProductController Structure)
 async def getAllTransactions():
-    Transactions = await transactions_collection.find().to_list()
-    print(Transactions)
+    try:
+        transactions = await transactions_collection.find().to_list(None)
 
-    for transaction in Transactions:
-
-        if "user_id" in transaction and isinstance(transaction["user_id"], ObjectId):
+        for transaction in transactions:
+            # Convert `_id` to string, keep others as strings
+            transaction["_id"] = str(transaction["_id"])
             transaction["user_id"] = str(transaction["user_id"])
-
-        user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
-        if user:
-            user["_id"] = str(user["_id"])
-            transaction["user_id"] = user
-
-        if "role_id" in transaction and isinstance(transaction["role_id"], ObjectId):
-            transaction["role_id"] = str(transaction["role_id"])
-
-        role = await role_collection.find_one({"_id": ObjectId(transaction["role_id"])})
-        if role:
-            role["_id"] = str(role["_id"])
-            transaction["role_id"] = role
-
-        if "category_id" in transaction and isinstance(transaction["category_id"], ObjectId):
             transaction["category_id"] = str(transaction["category_id"])
-
-        category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
-        if category:
-            category["_id"] = str(category["_id"])
-            transaction["category_id"] = category
-
-
-        if "subcategory_id" in transaction and isinstance(transaction["subcategory_id"], ObjectId):
             transaction["subcategory_id"] = str(transaction["subcategory_id"])
 
-        subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction["subcategory_id"])})
-        if subcategory:
-            subcategory["_id"] = str(subcategory["_id"])
-            transaction["subcategory_id"] = subcategory
-            
+            # Convert stored "DD/MM/YYYY" format back to "YYYY-MM-DD"
+            if "date" in transaction and isinstance(transaction["date"], str):
+                try:
+                    transaction["date"] = datetime.strptime(transaction["date"], "%d/%m/%Y").strftime("%Y-%m-%d")
+                except ValueError:
+                    pass  # Keep original format if conversion fails
 
-    return [TransactionOut(**transaction) for transaction in Transactions]
+            # Fetch and Convert References
+            category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
+            transaction["category_id"] = convert_objectid_to_str(category) if category else None
+
+            subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction["subcategory_id"])})
+            transaction["subcategory_id"] = convert_objectid_to_str(subcategory) if subcategory else None
+
+            user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
+            transaction["user_id"] = convert_objectid_to_str(user) if user else None
+
+        return [TransactionOut(**transaction) for transaction in transactions]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching transactions: {str(e)}")
 
 
-async def getTransactionByUserId(user_id:str):
-    Transactions = await transactions_collection.find({"user_id":user_id}).to_list()
-    print(Transactions)
+# Get Transactions by User ID (Follow ProductController Structure)
+async def getTransactionByUserId(user_id: str):
+    try:
+        transactions = await transactions_collection.find({"user_id": str(user_id)}).to_list(None)
 
-    for transaction in Transactions:
-
-        if "user_id" in transaction and isinstance(transaction["user_id"], ObjectId):
+        for transaction in transactions:
+            # Convert `_id` to string, keep others as strings
+            transaction["_id"] = str(transaction["_id"])
             transaction["user_id"] = str(transaction["user_id"])
-
-        user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
-        if user:
-            user["_id"] = str(user["_id"])
-            transaction["user_id"] = user
-
-        if "role_id" in transaction and isinstance(transaction["role_id"], ObjectId):
-            transaction["role_id"] = str(transaction["role_id"])
-
-        role = await role_collection.find_one({"_id": ObjectId(transaction["role_id"])})
-        if role:
-            role["_id"] = str(role["_id"])
-            transaction["role_id"] = role
-
-        if "category_id" in transaction and isinstance(transaction["category_id"], ObjectId):
             transaction["category_id"] = str(transaction["category_id"])
-
-        category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
-        if category:
-            category["_id"] = str(category["_id"])
-            transaction["category_id"] = category
-
-
-        if "subcategory_id" in transaction and isinstance(transaction["subcategory_id"], ObjectId):
             transaction["subcategory_id"] = str(transaction["subcategory_id"])
 
-        subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction["subcategory_id"])})
-        if subcategory:
-            subcategory["_id"] = str(subcategory["_id"])
-            transaction["subcategory_id"] = subcategory
+            # Convert stored "DD/MM/YYYY" format back to "YYYY-MM-DD"
+            if "date" in transaction and isinstance(transaction["date"], str):
+                try:
+                    transaction["date"] = datetime.strptime(transaction["date"], "%d/%m/%Y").strftime("%Y-%m-%d")
+                except ValueError:
+                    pass  # Keep original format if conversion fails
 
-    return [TransactionOut(**transaction) for transaction in Transactions]
+            # Fetch and Convert References
+            category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
+            transaction["category_id"] = convert_objectid_to_str(category) if category else None
+
+            subcategory = await sub_category_collection.find_one({"_id": ObjectId(transaction["subcategory_id"])})
+            transaction["subcategory_id"] = convert_objectid_to_str(subcategory) if subcategory else None
+
+            user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
+            transaction["user_id"] = convert_objectid_to_str(user) if user else None
+
+        return [TransactionOut(**transaction) for transaction in transactions]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching transactions for user: {str(e)}")
+
+
+# Add Transaction Report Functions Inside TransactionController
+async def generateTransactionReport(user_id: str, report_type: str, start_date: str, end_date: str):
+    return await generate_transaction_report(user_id, report_type, start_date, end_date)
+
+
+async def getTransactionReport(report_id: str):
+    return await get_transaction_report(report_id)

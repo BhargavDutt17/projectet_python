@@ -1,77 +1,135 @@
-from models.SubCategoryModel import SubCategory,SubCategoryOut
+from models.SubCategoryModel import SubCategory, SubCategoryOut
 from bson import ObjectId
-from config.database import sub_category_collection,category_collection,user_collection,role_collection
-from fastapi import APIRouter,HTTPException
+from config.database import (
+    sub_category_collection,
+    category_collection,
+    user_collection,
+    role_collection,
+)
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
+from typing import Optional
 
-async def addSubCategory(sub_category:SubCategory):
-    savedCategory = await sub_category_collection.insert_one(sub_category.dict())
-    return JSONResponse(content={"message":"SubCategory saved successfully!!"},status_code=201)
+
+async def addSubCategory(sub_category: SubCategory):
+    try:
+        sub_category_dict = sub_category.dict()
+        sub_category_dict["_id"] = ObjectId()
+        sub_category_dict["category_id"] = str(sub_category_dict["category_id"])
+        sub_category_dict["role_id"] = str(sub_category_dict["role_id"])
+        sub_category_dict["user_id"] = (
+            str(sub_category_dict["user_id"]) if sub_category_dict["user_id"] else None
+        )
+
+        # Fetch `role_name` from `role_collection` using `role_id`
+        role = await role_collection.find_one(
+            {"_id": ObjectId(sub_category_dict["role_id"])}
+        )
+        if role:
+            sub_category_dict["role_name"] = role[
+                "name"
+            ].lower()  #Normalize role name (e.g., "Admin" → "admin")
+        else:
+            raise HTTPException(status_code=400, detail="Invalid role_id provided")
+
+        await sub_category_collection.insert_one(sub_category_dict)
+        return JSONResponse(
+            content={"message": "SubCategory saved successfully!!"}, status_code=201
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error adding subcategory: {str(e)}"
+        )
+
 
 async def getAllSubCategories():
-    subCategories = await sub_category_collection.find().to_list()
-    
-    for subCat in subCategories:
-        if "user_id" in subCat and isinstance(subCat["user_id"],ObjectId):
-            subCat["user_id"] = str(subCat["user_id"])
-        
-        user = await user_collection.find_one({"_id":ObjectId(subCat["user_id"])})
-        if user:
-            user["_id"] = str(user["_id"])
-            subCat["user_id"] = user   
+    try:
+        subCategories = await sub_category_collection.find().to_list(None)
 
-
-        if "category_id" in subCat and isinstance(subCat["category_id"],ObjectId):
+        for subCat in subCategories:
+            subCat["_id"] = str(subCat["_id"])
+            subCat["user_id"] = (
+                str(subCat["user_id"]) if subCat.get("user_id") else None
+            )
             subCat["category_id"] = str(subCat["category_id"])
-        
-        category = await category_collection.find_one({"_id":ObjectId(subCat["category_id"])})
-        if category:
-            category["_id"] = str(category["_id"])
-            subCat["category_id"] = category  
+
+            # Fetch User Details (Admin or Regular User)
+            user = (
+                await user_collection.find_one({"_id": ObjectId(subCat["user_id"])})
+                if subCat["user_id"]
+                else None
+            )
+            subCat["user_id"] = user if user else None
+
+            # Fetch Category Details
+            category = await category_collection.find_one(
+                {"_id": ObjectId(subCat["category_id"])}
+            )
+            subCat["category_id"] = category if category else None
+
+            # Fetch Role Details & Convert `role_id` to Dictionary
+            if subCat.get("role_id"):
+                role = await role_collection.find_one(
+                    {"_id": ObjectId(subCat["role_id"])}
+                )
+                subCat["role_id"] = (
+                    {"_id": str(role["_id"]), "name": role["name"]} if role else None
+                )
+            else:
+                subCat["role_id"] = None  # Prevents validation error
+
+            # Ensure `role_name` is assigned
+            subCat["role_name"] = role["name"].lower() if role else "user"
+
+        return [SubCategoryOut(**subCat) for subCat in subCategories]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching all subcategories: {str(e)}"
+        )
 
 
-        if "role_id" in subCat and isinstance(subCat["role_id"],ObjectId):
-            subCat["role_id"] = str(subCat["role_id"])
-        
-        role = await role_collection.find_one({"_id":ObjectId(subCat["role_id"])})
-        if role:
-            role["_id"] = str(role["_id"])
-            subCat["role_id"] = role
-        
-    
-    return [SubCategoryOut(**subCat) for subCat in subCategories]        
-            
+async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = None, role_id: Optional[str] = None):
+    try:
+        filters = {"category_id": category_id}
 
-async def getSubCategoryByCategoryId(category_id:str):
-    subCategories = await sub_category_collection.find({"category_id":category_id}).to_list()
-    
-    for subCat in subCategories:
-        if "user_id" in subCat and isinstance(subCat["user_id"],ObjectId):
-            subCat["user_id"] = str(subCat["user_id"])
-        
-        user = await user_collection.find_one({"_id":ObjectId(subCat["user_id"])})
-        if user:
-            user["_id"] = str(user["_id"])
-            subCat["user_id"] = user   
+        # Fetch `role_name` using `role_id`
+        role_name = "user"  # Default role
+        if role_id:
+            role = await role_collection.find_one({"_id": ObjectId(role_id)})
+            if role:
+                role_name = role["name"].lower()  # Normalize role name
 
+        # Fetch both admin subcategories & user-defined subcategories
+        if role_name != "admin":
+            filters["$or"] = [
+                {"user_id": user_id},  # Fetch user-defined subcategories
+                {"role_name": "admin"}  # Fetch admin-defined subcategories
+            ]
 
-        if "category_id" in subCat and isinstance(subCat["category_id"],ObjectId):
+        subCategories = await sub_category_collection.find(filters).to_list(None)
+
+        # 🔹 Debugging: Print the fetched subcategories
+        print("Fetched Subcategories:", subCategories)
+
+        for subCat in subCategories:
+            subCat["_id"] = str(subCat["_id"])
+            subCat["user_id"] = str(subCat["user_id"]) if subCat.get("user_id") else None
             subCat["category_id"] = str(subCat["category_id"])
-        
-        category = await category_collection.find_one({"_id":ObjectId(subCat["category_id"])})
-        if category:
-            category["_id"] = str(category["_id"])
-            subCat["category_id"] = category  
+
+            # Fetch Role Details & Convert `role_id` to Dictionary
+            if subCat.get("role_id"):
+                role = await role_collection.find_one({"_id": ObjectId(subCat["role_id"])})
+                subCat["role_id"] = {"_id": str(role["_id"]), "name": role["name"]} if role else None
+            else:
+                subCat["role_id"] = None  # Prevents validation error
+
+            subCat["role_name"] = subCat.get("role_name", "user").capitalize()
+
+        return subCategories
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching subcategories by category: {str(e)}")
 
 
-        if "role_id" in subCat and isinstance(subCat["role_id"],ObjectId):
-            subCat["role_id"] = str(subCat["role_id"])
-        
-        role = await role_collection.find_one({"_id":ObjectId(subCat["role_id"])})
-        if role:
-            role["_id"] = str(role["_id"])
-            subCat["role_id"] = role
-        
-    
-    return [SubCategoryOut(**subCat) for subCat in subCategories]        
-            
