@@ -1,2 +1,1 @@
-19-03-2025
-Transactiona and subcategory codes are changed to some degree and now it work with front end.
+
