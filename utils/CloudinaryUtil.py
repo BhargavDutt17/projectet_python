@@ -14,11 +14,17 @@ async def upload_image(image):
     print("Cloudinary response (Image):", result)
     return result["secure_url"]  # Return URL as string
 
-# Upload file (Excel, CSV, PDF, etc.)
-async def upload_file(file, file_format="xlsx"):
+# Upload a file directly from memory (For Reports)
+async def upload_file_from_object(file_stream, file_name, file_format="xlsx"):
     if file_format not in ["xlsx", "csv", "pdf", "txt"]:
         raise ValueError("Unsupported file format. Use 'xlsx', 'csv', 'pdf', or 'txt'.")
 
-    result = upload(file, resource_type="raw", format=file_format)  # Ensures correct format
-    print("Cloudinary response (File):", result)
-    return result["secure_url"]  # Return URL as string
+    result = upload(
+        file_stream,
+        resource_type="raw",  # Ensure it's uploaded as a file (not an image)
+        public_id=f"transaction_reports/{file_name}",  # Store in Cloudinary folder
+        format=file_format,
+        overwrite=True  # Overwrite if the file already exists
+    )
+
+    return result["secure_url"]

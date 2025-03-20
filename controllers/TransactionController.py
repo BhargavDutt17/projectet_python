@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from controllers.TransactionReportController import (
     generate_transaction_report,
     get_transaction_report,
+    get_latest_transaction_report,
+    get_all_transaction_reports
 )
 from datetime import datetime
 
@@ -124,9 +126,14 @@ async def getTransactionByUserId(user_id: str):
 
 
 # Add Transaction Report Functions Inside TransactionController
-async def generateTransactionReport(user_id: str, report_type: str, start_date: str, end_date: str):
-    return await generate_transaction_report(user_id, report_type, start_date, end_date)
-
+async def generateTransactionReport(user_id: str, start_date: str, end_date: str):
+    return await generate_transaction_report(user_id, start_date, end_date)
 
 async def getTransactionReport(report_id: str):
     return await get_transaction_report(report_id)
+
+async def getLatestTransactionReport(user_id: str):
+    return await get_latest_transaction_report(user_id)
+
+async def getAllTransactionReports(user_id: str):
+    return await get_all_transaction_reports(user_id)
