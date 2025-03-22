@@ -92,31 +92,47 @@ async def getAllSubCategories():
 
 async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = None, role_id: Optional[str] = None):
     try:
-        filters = {"category_id": category_id}
+        filters = {}
+
+        # 🔹 Debugging: Print received parameters
+        print(f"🟢 Received category_id: {category_id}, user_id: {user_id}, role_id: {role_id}")
+
+        # If category_id is "all", fetch all subcategories for the user
+        if category_id.lower() == "all":
+            filters["user_id"] = user_id
+        else:
+            filters["category_id"] = category_id
 
         # Fetch `role_name` using `role_id`
-        role_name = "user"  # Default role
+        role_name = "user"
         if role_id:
             role = await role_collection.find_one({"_id": ObjectId(role_id)})
             if role:
-                role_name = role["name"].lower()  # Normalize role name
+                role_name = role["name"].lower()
 
         # Fetch both admin subcategories & user-defined subcategories
         if role_name != "admin":
             filters["$or"] = [
-                {"user_id": user_id},  # Fetch user-defined subcategories
-                {"role_name": "admin"}  # Fetch admin-defined subcategories
+                {"user_id": user_id},
+                {"role_name": "admin"}
             ]
+
+        # 🔹 Debugging: Print MongoDB query filters
+        print(f"🟢 MongoDB Query Filters: {filters}")
 
         subCategories = await sub_category_collection.find(filters).to_list(None)
 
-        # 🔹 Debugging: Print the fetched subcategories
-        print("Fetched Subcategories:", subCategories)
+        # 🔹 Debugging: Print fetched subcategories
+        print(f"🟢 Fetched Subcategories from MongoDB: {subCategories}")
 
         for subCat in subCategories:
             subCat["_id"] = str(subCat["_id"])
             subCat["user_id"] = str(subCat["user_id"]) if subCat.get("user_id") else None
             subCat["category_id"] = str(subCat["category_id"])
+            
+             # 🔹 Fetch the category name (Income/Expense)
+            category = await category_collection.find_one({"_id": ObjectId(subCat["category_id"])})
+            subCat["category_type"] = category["name"].lower() if category else "unknown"
 
             # Fetch Role Details & Convert `role_id` to Dictionary
             if subCat.get("role_id"):
@@ -130,6 +146,4 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
         return subCategories
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching subcategories by category: {str(e)}")
-
-
+        raise HTTPException(status_code=500, detail=f"Error fetching subcategories: {str(e)}")
