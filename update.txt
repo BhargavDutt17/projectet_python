@@ -3,3 +3,6 @@ Transaction and subcategory codes are changed to some degree and now it work wit
 
 20-03-2025
 transactionreport, cloudinary util,transaction routes,trasactioncontroller code is updated
+
+22-03-2025
+subcategory backend is now working properly with frontend

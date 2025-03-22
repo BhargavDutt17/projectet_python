@@ -133,6 +133,10 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
              # 🔹 Fetch the category name (Income/Expense)
             category = await category_collection.find_one({"_id": ObjectId(subCat["category_id"])})
             subCat["category_type"] = category["name"].lower() if category else "unknown"
+            
+            # 🔹 Remove "(Userdefined)" from the description if it exists
+            if "description" in subCat and isinstance(subCat["description"], str):
+                subCat["description"] = subCat["description"].replace("(Userdefined)", "").strip()
 
             # Fetch Role Details & Convert `role_id` to Dictionary
             if subCat.get("role_id"):
