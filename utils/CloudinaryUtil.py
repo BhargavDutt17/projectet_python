@@ -10,9 +10,10 @@ cloudinary.config(
 
 # Upload image (for profile pictures, products, etc.)
 async def upload_image(image):
-    result = upload(image, resource_type="image")  # Ensure it's an image
-    print("Cloudinary response (Image):", result)
-    return result["secure_url"]  # Return URL as string
+    image_bytes = await image.read()  # Await the coroutine to read the file
+    result = upload(image_bytes, resource_type="image")  # Now `image_bytes` is readable
+    return result["secure_url"]
+
 
 # Upload a file directly from memory (For Reports)
 async def upload_file_from_object(file_stream, file_name, file_format="xlsx"):

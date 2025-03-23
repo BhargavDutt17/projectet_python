@@ -94,8 +94,8 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
     try:
         filters = {}
 
-        # 🔹 Debugging: Print received parameters
-        print(f"🟢 Received category_id: {category_id}, user_id: {user_id}, role_id: {role_id}")
+        # # Debugging: Print received parameters
+        # print(f"Received category_id: {category_id}, user_id: {user_id}, role_id: {role_id}")
 
         # If category_id is "all", fetch all subcategories for the user
         if category_id.lower() == "all":
@@ -117,24 +117,24 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
                 {"role_name": "admin"}
             ]
 
-        # 🔹 Debugging: Print MongoDB query filters
-        print(f"🟢 MongoDB Query Filters: {filters}")
+        # # Debugging: Print MongoDB query filters
+        # print(f"MongoDB Query Filters: {filters}")
 
         subCategories = await sub_category_collection.find(filters).to_list(None)
 
-        # 🔹 Debugging: Print fetched subcategories
-        print(f"🟢 Fetched Subcategories from MongoDB: {subCategories}")
+        # # Debugging: Print fetched subcategories
+        # print(f"Fetched Subcategories from MongoDB: {subCategories}")
 
         for subCat in subCategories:
             subCat["_id"] = str(subCat["_id"])
             subCat["user_id"] = str(subCat["user_id"]) if subCat.get("user_id") else None
             subCat["category_id"] = str(subCat["category_id"])
             
-             # 🔹 Fetch the category name (Income/Expense)
+             # Fetch the category name (Income/Expense)
             category = await category_collection.find_one({"_id": ObjectId(subCat["category_id"])})
             subCat["category_type"] = category["name"].lower() if category else "unknown"
             
-            # 🔹 Remove "(Userdefined)" from the description if it exists
+            # Remove "(Userdefined)" from the description if it exists
             if "description" in subCat and isinstance(subCat["description"], str):
                 subCat["description"] = subCat["description"].replace("(Userdefined)", "").strip()
 
