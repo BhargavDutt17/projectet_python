@@ -9,3 +9,6 @@ subcategory backend is now working properly with frontend
 
 23-03-2025
 added profile picture upload function
+
+24-03-2025
+modification in user Controller, model and routes so we can login with username or email

@@ -80,16 +80,21 @@ async def getUserProfile(user_id: str):
 
 
 async def loginUser(request: UserLogin):
-    foundUser = await user_collection.find_one({"email": request.email})
+    # Check if user exists with either email or username
+    foundUser = await user_collection.find_one({
+        "$or": [{"email": request.email_or_username}, {"username": request.email_or_username}]
+    })
+
     if not foundUser:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     foundUser["_id"] = str(foundUser["_id"])
     foundUser["role_id"] = str(foundUser["role_id"])
-    
+
     if "password" in foundUser and bcrypt.checkpw(request.password.encode(), foundUser["password"].encode()):
-        role = await role_collection.find_one({"_id": ObjectId(foundUser["role_id"])});
+        role = await role_collection.find_one({"_id": ObjectId(foundUser["role_id"])})
         foundUser["role"] = role
         return {"message": "User login success", "user": UserOut(**foundUser)}
     else:
         raise HTTPException(status_code=404, detail="Invalid password")
+

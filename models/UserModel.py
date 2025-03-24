@@ -33,5 +33,5 @@ class UserOut(User):
         return v
 
 class UserLogin(BaseModel):
-    email: str
+    email_or_username: str  # Accepts either email or username
     password: str
