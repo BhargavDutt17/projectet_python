@@ -5,8 +5,9 @@ from cloudinary.uploader import upload
 cloudinary.config(
     cloud_name="dvpsq8fur",
     api_key="844355169722191",
-    api_secret="g9ZHUl_13Mn3-XjaWvNiMdUVZdo"
+    api_secret="g9ZHUl_13Mn3-XjaWvNiMdUVZdo",
 )
+
 
 # Upload image (for profile pictures, products, etc.)
 async def upload_image(image):
@@ -25,7 +26,7 @@ async def upload_file_from_object(file_stream, file_name, file_format="xlsx"):
         resource_type="raw",  # Ensure it's uploaded as a file (not an image)
         public_id=f"transaction_reports/{file_name}",  # Store in Cloudinary folder
         format=file_format,
-        overwrite=True  # Overwrite if the file already exists
+        overwrite=True,  # Overwrite if the file already exists
     )
 
     return result["secure_url"]

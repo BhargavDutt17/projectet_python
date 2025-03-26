@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Form, UploadFile, File
-from controllers.UserController import addUser, getAllUsers, loginUser, uploadUserProfileImage , getUserProfile
+from controllers import UserController
 from models.UserModel import UserLogin
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -15,23 +16,57 @@ async def post_user(
     status: str = Form("active"),
     profile_image: UploadFile = File(None)  # Optional profile image
 ):
-    return await addUser(firstName, lastName, username, email, password, inviteCode, status, profile_image)
+    return await UserController.addUser(firstName, lastName, username, email, password, inviteCode, status, profile_image)
 
 @router.get("/users/")
 async def get_users():
-    return await getAllUsers()
+    return await UserController.getAllUsers()
 
 @router.post("/users/login/")
 async def login_user(user: UserLogin):
-    return await loginUser(user)
+    return await UserController.loginUser(user)
 
 @router.post("/users/upload-profile/")
 async def upload_profile_image(
     user_id: str = Form(...), 
     image: UploadFile = File(...)
 ):
-    return await uploadUserProfileImage(user_id, image)
+    return await UserController.uploadUserProfileImage(user_id, image)
 
 @router.get("/user/profile/{user_id}")
 async def get_user_profile(user_id: str):
-    return await getUserProfile(user_id)
+    return await UserController.getUserProfile(user_id)
+
+
+# Define request models for JSON input
+class UpdateUsernameModel(BaseModel):
+    new_username: str
+
+class UpdateEmailModel(BaseModel):
+    new_email: str
+
+class UpdatePasswordModel(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+# Route to update username (Now Accepts JSON)
+@router.put("/update-username/{user_id}")
+async def update_user_username(user_id: str, data: UpdateUsernameModel):
+    return await UserController.update_username(user_id, data.new_username)
+
+# Route to update email (Now Accepts JSON)
+@router.put("/update-email/{user_id}")
+async def update_user_email(user_id: str, data: UpdateEmailModel):
+    return await UserController.update_email(user_id, data.new_email)
+
+# Route to change password (Now Accepts JSON)
+@router.put("/change-password/{user_id}")
+async def update_user_password(user_id: str, data: UpdatePasswordModel):
+    return await UserController.change_password(user_id, data.current_password, data.new_password, data.confirm_password)
+
+# Route to update profile picture
+@router.put("/update-profile-picture/{user_id}")
+async def update_profile_picture(user_id: str, image: UploadFile): 
+    return await UserController.update_profile_picture(user_id, image)

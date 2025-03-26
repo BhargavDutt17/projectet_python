@@ -74,9 +74,9 @@ async def getUserProfile(user_id: str):
 
     return {
         "username": user["username"],
+        "email": user["email"],
         "profile_image": user.get("profile_image", None)
     }
-
 
 
 async def loginUser(request: UserLogin):
@@ -97,4 +97,67 @@ async def loginUser(request: UserLogin):
         return {"message": "User login success", "user": UserOut(**foundUser)}
     else:
         raise HTTPException(status_code=404, detail="Invalid password")
+    
+    # Update Username
+async def update_username(user_id: str, new_username: str):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"username": new_username}}
+    )
+    return {"message": "Username updated successfully"}
+
+# Update Email
+async def update_email(user_id: str, new_email: str):
+    existing_user = await user_collection.find_one({"email": new_email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already in use")
+
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"email": new_email}}
+    )
+    return {"message": "Email updated successfully"}
+
+# Change Password
+async def change_password(user_id: str, current_password: str, new_password: str, confirm_password: str):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if current password matches
+    if not bcrypt.checkpw(current_password.encode(), user["password"].encode()):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+
+    # Ensure new password and confirm password match
+    if new_password != confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirm password do not match")
+
+    # Hash the new password
+    hashed_password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password": hashed_password}}
+    )
+    return {"message": "Password updated successfully"}
+
+
+# Update Profile Picture
+async def update_profile_picture(user_id: str, image: UploadFile):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 🔹 Upload new image to Cloudinary
+    image_url = await upload_image(image)  
+
+    # 🔹 Update the database with the new image URL
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"profile_image": image_url}}
+    )
+
+    return {"message": "Profile picture updated successfully", "profile_image": image_url}

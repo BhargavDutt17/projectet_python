@@ -12,3 +12,6 @@ added profile picture upload function
 
 24-03-2025
 modification in user Controller, model and routes so we can login with username or email
+
+27-03-2025
+username,email,password and profile picture can be now update using frontend and docs
