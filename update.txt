@@ -15,3 +15,6 @@ modification in user Controller, model and routes so we can login with username 
 
 27-03-2025
 username,email,password and profile picture can be now update using frontend and docs
+
+02-04-2025
+made some change in transaction api for chart

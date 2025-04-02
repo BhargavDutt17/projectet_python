@@ -12,7 +12,8 @@ from controllers.TransactionReportController import (
     generate_transaction_report,
     get_transaction_report,
     get_latest_transaction_report,
-    get_all_transaction_reports
+    get_all_transaction_reports,
+    delete_transaction_report
 )
 from datetime import datetime
 
@@ -91,10 +92,11 @@ async def getAllTransactions():
 
 
 # Get Transactions by User ID (Follow ProductController Structure)
-async def getTransactionByUserId(user_id: str):
+async def getTransactionByUserId(user_id: str, month: int = None, year: int = None):
     try:
         transactions = await transactions_collection.find({"user_id": str(user_id)}).to_list(None)
 
+        filtered_transactions = []
         for transaction in transactions:
             # Convert `_id` to string, keep others as strings
             transaction["_id"] = str(transaction["_id"])
@@ -105,7 +107,13 @@ async def getTransactionByUserId(user_id: str):
             # Convert stored "DD/MM/YYYY" format back to "YYYY-MM-DD"
             if "date" in transaction and isinstance(transaction["date"], str):
                 try:
-                    transaction["date"] = datetime.strptime(transaction["date"], "%d/%m/%Y").strftime("%Y-%m-%d")
+                    # Convert string date "DD/MM/YYYY" to datetime object
+                    transaction_date = datetime.strptime(transaction["date"], "%d/%m/%Y")
+                    transaction["date"] = transaction_date.strftime("%Y-%m-%d")
+
+                    # Apply month and year filter if provided
+                    if (month is None or transaction_date.month == month) and (year is None or transaction_date.year == year):
+                        filtered_transactions.append(transaction)
                 except ValueError:
                     pass  # Keep original format if conversion fails
 
@@ -119,7 +127,7 @@ async def getTransactionByUserId(user_id: str):
             user = await user_collection.find_one({"_id": ObjectId(transaction["user_id"])})
             transaction["user_id"] = convert_objectid_to_str(user) if user else None
 
-        return [TransactionOut(**transaction) for transaction in transactions]
+        return [TransactionOut(**transaction) for transaction in filtered_transactions]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching transactions for user: {str(e)}")
@@ -137,3 +145,7 @@ async def getLatestTransactionReport(user_id: str):
 
 async def getAllTransactionReports(user_id: str):
     return await get_all_transaction_reports(user_id)
+
+async def deleteTransactionReport(report_id: str):
+    # ✅ Call a properly defined function instead of itself
+    return await delete_transaction_report(report_id)
