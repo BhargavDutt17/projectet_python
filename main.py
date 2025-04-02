@@ -5,6 +5,7 @@ from routes.UserRoutes import router as user_router
 from routes.CategoryRoutes import router as category_router
 from routes.SubCategoryRoutes import router as sub_category_router
 from routes.TransactionRoutes import router as transaction_router
+from routes.AdRoutes import router as ad_router
 
 app = FastAPI()
 
@@ -23,4 +24,4 @@ app.include_router(role_router)
 app.include_router(category_router)
 app.include_router(sub_category_router)
 app.include_router(transaction_router)
-
+app.include_router(ad_router)
