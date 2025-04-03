@@ -1,27 +1,18 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, HTTPException
 from controllers.AdController import get_ads
 from models.AdModel import AdResponse
 from typing import List
 
 router = APIRouter()
 
-@router.get("/ads/{user_id}", response_model=List[AdResponse])
-async def fetch_ads(user_id: str):
-    return await get_ads(user_id)
+@router.get("/ads/income/{user_id}", response_model=List[AdResponse])
+async def fetch_income_ads(user_id: str):
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+    return await get_ads(user_id, "income")
 
-# @router.get("/ads/{user_id}", response_model=List[AdResponse])
-# async def fetch_ads(user_id: str):
-#     ads = await get_ads(user_id)
-#     print(f"Swagger Response: {ads}")  # ✅ Debugging
-#     return ads
-
-
-# @router.get("/ads/{user_id}", response_model=List[AdResponse] | None)
-# async def fetch_ads(user_id: str):
-#     ads = await get_ads(user_id)
-#     return ads if ads else None  # Return None instead of an empty list
-
-# @router.get("/ads/{user_id}", response_model=List[AdResponse])
-# async def fetch_ads(user_id: str):
-#     ads = await get_ads(user_id)
-#     return ads if ads else []  # ✅ Ensure response is always a list
+@router.get("/ads/expense/{user_id}", response_model=List[AdResponse])
+async def fetch_expense_ads(user_id: str):
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+    return await get_ads(user_id, "expense")

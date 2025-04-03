@@ -1,80 +1,75 @@
-from config.database import transactions_collection, category_collection
+from fastapi import HTTPException
 from bson import ObjectId
 from models.AdModel import AdResponse
-from typing import List
-from datetime import datetime
-from fastapi import HTTPException
+from config.database import transactions_collection, sub_category_collection, category_collection
 
-async def get_ads(user_id: str) -> List[AdResponse]:
-    try:
-        transactions = await transactions_collection.find({"user_id": str(user_id)}).to_list(length=None)
+async def get_ads(user_id: str, ad_type: str):
+    user_expenses = {}
+    total_income = 0
+    total_expense = 0
 
-        if not transactions:
-            return []  # ✅ Return empty list if no transactions found
+    # 🔹 Fetch all transactions for the given user
+    transactions = await transactions_collection.find({"user_id": user_id}).to_list(None)
 
-        income = 0
-        expense = 0
-        current_month = datetime.now().strftime("%m/%Y")  # ✅ Get the current month
+    if not transactions:
+        raise HTTPException(status_code=400, detail="No transactions found for this user")
 
-        for transaction in transactions:
-            try:
-                transaction_date = datetime.strptime(transaction["date"], "%d/%m/%Y")
-                transaction_month = transaction_date.strftime("%m/%Y")
+    for transaction in transactions:
+        category_id = transaction.get("category_id")
+        subcategory_id = transaction.get("subcategory_id")
+        amount = float(transaction.get("amount", 0))
 
-                if transaction_month == current_month:
-                    category = await category_collection.find_one({"_id": ObjectId(transaction["category_id"])})
-                    transaction_type = category["name"] if category else None
+        # 🔹 Fetch category details (to determine if it's Income or Expense)
+        category_data = await category_collection.find_one({"_id": ObjectId(category_id)})
+        category_type = category_data["name"] if category_data else None
 
-                    if transaction_type == "Income":
-                        income += float(transaction["amount"])
-                    elif transaction_type == "Expense":
-                        expense += float(transaction["amount"])
-            except ValueError:
-                continue  # Skip invalid dates
+        if category_type == "Income":
+            total_income += amount
+        elif category_type == "Expense":
+            total_expense += amount
 
-        ads = []
+            # 🔹 Fetch subcategory details (to get subcategory name)
+            subcategory_name = "Unknown"
+            if subcategory_id:
+                subcategory_data = await sub_category_collection.find_one({"_id": ObjectId(subcategory_id)})
+                if subcategory_data and "name" in subcategory_data:
+                    subcategory_name = subcategory_data["name"]
 
-        if income > 0:  # ✅ Prevent division by zero
-            expense_percentage = (expense / income) * 100
-            savings_percentage = 100 - expense_percentage
+            # 🔹 Accumulate expenses per subcategory
+            user_expenses[subcategory_name] = user_expenses.get(subcategory_name, 0) + amount
 
-            print(f"Income: {income}, Expense: {expense}, Expense %: {expense_percentage}, Savings %: {savings_percentage}")
+    if total_income == 0:
+        raise HTTPException(status_code=400, detail="No income data found")
 
-            # 🔹 If expense is more than 60% -> Show expense management ads
-            if expense_percentage > 60:
-                ads.extend([
-                    AdResponse(
-                        title="Expense Management Tips",
-                        message="Your expenses are over 60%! Consider using budgeting apps to track and reduce spending."
-                    ),
-                    AdResponse(
-                        title="Save on Monthly Bills!",
-                        message="Switch to cost-effective plans and subscriptions to lower your monthly expenses."
-                    ),
-                    AdResponse(
-                        title="Cut Unnecessary Expenses",
-                        message="Review your spending habits and identify non-essential expenses to save more."
-                    )
-                ])
+    # 🔹 Calculate savings and expense percentages
+    savings_percentage = ((total_income - total_expense) / total_income) * 100
+    expense_percentage = (total_expense / total_income) * 100
 
-            # 🔹 If expense is less than 60% -> Show investment ads
-            if savings_percentage > 60:
-                ads.extend([
-                    AdResponse(
-                        title="Invest Smartly!",
-                        message="You're saving more than 60%! Explore investment opportunities in mutual funds, stocks, or real estate."
-                    ),
-                    AdResponse(
-                        title="Grow Your Wealth",
-                        message="Consider setting up a high-interest savings account or an automated investment plan."
-                    ),
-                    AdResponse(
-                        title="Financial Freedom",
-                        message="Use your savings wisely! Check out courses on financial planning and wealth management."
-                    )
-                ])
+    ads = []
 
-        return ads
+    # 🔹 Show investment ads if savings > 60%
+    if ad_type == "income" and savings_percentage > 60:
+        investment_ad_templates = [
+            "Smart ways to invest your money",
+            "How to maximize your wealth?",
+            "Top investment strategies in 2024",
+            "The power of compound interest",
+            "Build a passive income stream today!",
+            "Why saving is not enough: Start investing!"
+        ]
+        ads = [AdResponse(title=title, message="Discover how to grow your savings effectively.") for title in investment_ad_templates]
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # 🔹 Show expense reduction ads if expenses > 60%
+    elif ad_type == "expense" and expense_percentage > 60:
+        sorted_expenses = sorted(user_expenses.items(), key=lambda x: x[1], reverse=True)[:6]
+        for subcategory, _ in sorted_expenses:
+            ads.extend([
+                AdResponse(title=f"How to spend less on {subcategory}?", message=f"Learn effective ways to reduce expenses on {subcategory} and save more!"),
+                AdResponse(title=f"Benefits of cutting down {subcategory} expenses", message=f"See how minimizing {subcategory} expenses can improve your financial health."),
+                AdResponse(title=f"Top 5 tips to reduce {subcategory} spending", message=f"Discover proven techniques to lower your {subcategory} costs without compromising quality."),
+                AdResponse(title=f"How much do you really spend on {subcategory}?", message=f"Track your {subcategory} expenses and learn where you can cut back effectively."),
+                AdResponse(title=f"Best alternatives to expensive {subcategory} purchases", message=f"Find budget-friendly alternatives to costly {subcategory} expenses!"),
+                AdResponse(title=f"Secrets to financial freedom: Reduce {subcategory} expenses", message=f"Master the art of cutting {subcategory} costs while enjoying financial stability."),
+            ])
+
+    return ads
