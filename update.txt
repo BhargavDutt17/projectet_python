@@ -18,3 +18,7 @@ username,email,password and profile picture can be now update using frontend and
 
 02-04-2025
 made some change in transaction api for chart
+
+04-04-2025
+demo ads is added and use your own serp api key in utils/fetchImage.py 
+and edit and delete for catgeory and transaction is added 

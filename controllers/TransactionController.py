@@ -133,6 +133,65 @@ async def getTransactionByUserId(user_id: str, month: int = None, year: int = No
         raise HTTPException(status_code=500, detail=f"Error fetching transactions for user: {str(e)}")
 
 
+async def editTransaction(transaction_id: str, updated_data: dict):
+    try:
+        # Fetch the existing transaction from the database
+        existing_transaction = await transactions_collection.find_one({"_id": ObjectId(transaction_id)})
+
+        if not existing_transaction:
+            raise HTTPException(status_code=404, detail="Transaction not found.")
+
+        # Only update fields that are present in updated_data and not empty
+        update_fields = {
+            key: updated_data[key]
+            for key in updated_data 
+            if updated_data[key] is not None and updated_data[key] != "string"
+        }
+
+        # Ensure we don't update with empty data
+        if not update_fields:
+            return {"message": "No valid fields provided for update."}
+
+        # Ensure date formatting if updated
+        if "date" in update_fields:
+            try:
+                update_fields["date"] = datetime.strptime(update_fields["date"], "%Y-%m-%d").strftime("%d/%m/%Y")
+            except ValueError:
+                pass  # Keep existing format if conversion fails
+
+        # Perform update operation
+        result = await transactions_collection.update_one(
+            {"_id": ObjectId(transaction_id)},
+            {"$set": update_fields}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Transaction not found.")
+
+        return {"message": "Transaction updated successfully!"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating transaction: {str(e)}")
+    
+    
+    # Delete Transaction (Optional user_id)
+async def deleteTransaction(transaction_id: str, user_id: str = None):
+    try:
+        query = {"_id": ObjectId(transaction_id)}
+        if user_id:
+            query["user_id"] = user_id
+
+        result = await transactions_collection.delete_one(query)
+
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Transaction not found or unauthorized access.")
+
+        return JSONResponse(content={"message": "Transaction deleted successfully!"}, status_code=200)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting transaction: {str(e)}")
+
+
 # Add Transaction Report Functions Inside TransactionController
 async def generateTransactionReport(user_id: str, start_date: str, end_date: str):
     return await generate_transaction_report(user_id, start_date, end_date)

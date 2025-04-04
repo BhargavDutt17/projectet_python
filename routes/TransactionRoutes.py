@@ -1,6 +1,8 @@
-from fastapi import APIRouter
-from models.TransactionModel import Transaction
+from fastapi import APIRouter,Body
+from models.TransactionModel import Transaction,TransactionUpdate
 from controllers import TransactionController
+from typing import Optional
+
 
 router = APIRouter()
 
@@ -50,3 +52,19 @@ async def get_all_transaction_reports(user_id: str):
 @router.delete("/transaction-reports/{report_id}")
 async def delete_transaction_report(report_id: str):
     return await TransactionController.delete_transaction_report(report_id)
+
+
+@router.delete("/deleteTransaction/{transaction_id}")
+async def delete_transaction(transaction_id: str, user_id: Optional[str] = None):
+    return await TransactionController.deleteTransaction(transaction_id, user_id)
+
+from typing import Dict
+
+@router.put("/editTransaction/{transaction_id}")
+async def edit_transaction(
+    transaction_id: str, 
+    updated_data: TransactionUpdate = Body(...)
+):
+    # Convert Pydantic model to dictionary and remove unset values (None)
+    update_dict = updated_data.dict(exclude_unset=True)
+    return await TransactionController.editTransaction(transaction_id, update_dict)

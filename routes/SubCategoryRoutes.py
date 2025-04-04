@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query,Body
 from models.SubCategoryModel import SubCategory
 from controllers import SubCategoryController
 
@@ -24,3 +24,13 @@ async def get_sub_category_by_category_id(
     return await SubCategoryController.getSubCategoryByCategoryId(
         category_id, user_id, role_id
     )
+
+
+
+@router.delete("/deleteSubCategory/{subcategory_id}")
+async def delete_sub_category(subcategory_id: str):
+    return await SubCategoryController.deleteSubCategory(subcategory_id)
+
+@router.put("/editSubcategory/{sub_category_id}")
+async def update_subcategory(sub_category_id: str, update_data: dict = Body(...)):
+    return await  SubCategoryController.editSubCategory(sub_category_id, update_data)

@@ -10,6 +10,14 @@ class Transaction(BaseModel):
     amount: float
     date: str  # Date in "DD/MM/YYYY" format
     description: Optional[str] = ""
+    
+class TransactionUpdate(BaseModel):
+    user_id: Optional[str]
+    category_id: Optional[str]
+    subcategory_id: Optional[str]
+    amount: Optional[float]
+    date: Optional[str]
+    description: Optional[str]
 
 class TransactionOut(Transaction):
     id: str = Field(alias='_id')
