@@ -116,7 +116,7 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
 
         cloudinary_url = await upload_file_from_object(output, file_name, "xlsx")
 
-        report_data = {
+        report_data = { 
             "user_id": user_id,
             "username": username,
             "start_date": start_date,
