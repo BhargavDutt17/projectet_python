@@ -12,4 +12,6 @@ category_collection = db["categories"]
 sub_category_collection = db["sub_categories"]
 transactions_collection = db["transaction"]
 transaction_report_collection = db["transactions_report"]
+deleted_user_collection = db["deletedusers"]
+
 

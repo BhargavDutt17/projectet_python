@@ -22,3 +22,6 @@ made some change in transaction api for chart
 04-04-2025
 demo ads is added and use your own serp api key in utils/fetchImage.py 
 and edit and delete for catgeory and transaction is added 
+
+08-04-2025
+add delete and deactivate users with cronjobs

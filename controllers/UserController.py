@@ -1,14 +1,22 @@
 from models.UserModel import User, UserOut, UserLogin
 from bson import ObjectId
-from config.database import user_collection, role_collection
+from config.database import user_collection, role_collection, deleted_user_collection
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 import bcrypt
 from utils.SendMail import send_mail
 from utils.CloudinaryUtil import upload_image  # Import Cloudinary upload function
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+import asyncio
 
 # Temporary admin invite code
 ADMIN_INVITE_CODE = "ADMIN123"
+
+scheduled_deletion_jobs = {}
+scheduled_deactivation_jobs = {}
+scheduler = BackgroundScheduler()
+scheduler.start()
 
 
 async def addUser(
@@ -120,6 +128,22 @@ async def loginUser(request: UserLogin):
     if not foundUser:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if foundUser.get("status") != "active":
+        raise HTTPException(status_code=403, detail="User is deactivated")
+
+    # Cancel scheduled deletion if exists
+    user_id = str(foundUser["_id"])
+    if user_id in scheduled_deletion_jobs:
+        scheduled_deletion_jobs[user_id].remove()
+        scheduled_deletion_jobs.pop(user_id)
+        print(f"Canceled scheduled deletion for user: {user_id}")
+
+    # Cancel scheduled deactivation if exists
+    if user_id in scheduled_deactivation_jobs:
+        scheduled_deactivation_jobs[user_id].remove()
+        scheduled_deactivation_jobs.pop(user_id)
+        print(f"Canceled scheduled deactivation for user: {user_id}")
+
     foundUser["_id"] = str(foundUser["_id"])
     foundUser["role_id"] = str(foundUser["role_id"])
 
@@ -132,9 +156,8 @@ async def loginUser(request: UserLogin):
     else:
         raise HTTPException(status_code=404, detail="Invalid password")
 
-    # Update Username
 
-
+# Update Username
 async def update_username(user_id: str, new_username: str):
     user = await user_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
@@ -186,16 +209,48 @@ async def change_password(
     return {"message": "Password updated successfully"}
 
 
+# Trigger Deactivate
+async def trigger_user_deactivation(user_id: str, role: str, password: str = None):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if role != "admin":
+        if not password or not bcrypt.checkpw(
+            password.encode(), user["password"].encode()
+        ):
+            raise HTTPException(status_code=403, detail="Invalid password")
+
+    schedule_deactivate(user_id)
+    return {"message": "User deactivation scheduled. Will be inactive in 1 minute."}
+
+
+# Trigger Delete
+async def trigger_user_deletion(user_id: str, role: str, password: str = None):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if role != "admin":
+        if not password or not bcrypt.checkpw(
+            password.encode(), user["password"].encode()
+        ):
+            raise HTTPException(status_code=403, detail="Invalid password")
+
+    schedule_delete(user_id, user["email"])
+    return {"message": "User deletion scheduled. Will be deleted in 1 minute."}
+
+
 # Update Profile Picture
 async def update_profile_picture(user_id: str, image: UploadFile):
     user = await user_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 🔹 Upload new image to Cloudinary
+    # Upload new image to Cloudinary
     image_url = await upload_image(image)
 
-    # 🔹 Update the database with the new image URL
+    # Update the database with the new image URL
     await user_collection.update_one(
         {"_id": ObjectId(user_id)}, {"$set": {"profile_image": image_url}}
     )
@@ -204,3 +259,73 @@ async def update_profile_picture(user_id: str, image: UploadFile):
         "message": "Profile picture updated successfully",
         "profile_image": image_url,
     }
+
+
+# Helper: Schedule deactivation using global scheduler
+def schedule_deactivate(user_id: str):
+    loop = asyncio.get_event_loop()
+
+    # Cancel previous job if exists
+    if user_id in scheduled_deactivation_jobs:
+        scheduled_deactivation_jobs[user_id].remove()
+        scheduled_deactivation_jobs.pop(user_id)
+
+    # Schedule deactivation
+    job = scheduler.add_job(
+        lambda: loop.create_task(deactivate_user(user_id)),
+        trigger="date",
+        run_date=datetime.now() + timedelta(minutes=1),
+    )
+
+    scheduled_deactivation_jobs[user_id] = job
+
+
+def schedule_delete(user_id: str, email: str):
+    loop = asyncio.get_event_loop()
+
+    # Cancel any existing deletion job for this user
+    if user_id in scheduled_deletion_jobs:
+        old_job = scheduled_deletion_jobs.pop(user_id)
+        old_job.remove()
+
+    # Schedule new deletion
+    job = scheduler.add_job(
+        lambda: loop.create_task(delete_user(user_id, email)),
+        trigger="date",
+        run_date=datetime.now() + timedelta(minutes=1),
+    )
+
+    # Store the job reference
+    scheduled_deletion_jobs[user_id] = job
+
+
+# APScheduler Task: Deactivate User
+async def deactivate_user(user_id: str):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        print(f"User {user_id} not found.")
+        return
+
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)}, {"$set": {"status": "inactive"}}
+    )
+    print(f"User {user_id} deactivated.")
+
+
+# APScheduler Task: Delete User
+async def delete_user(user_id: str, email: str):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        print(f"User {user_id} not found.")
+        return
+
+    # ➕ Add status before archiving
+    user["status"] = "permanently_deleted"
+
+    # Move user to deleted_user_collection with status
+    await deleted_user_collection.insert_one(user)
+
+    # Delete user from main user collection
+    await user_collection.delete_one({"_id": ObjectId(user_id)})
+
+    print(f"User {email} deleted, archived, and marked as permanently_deleted.")

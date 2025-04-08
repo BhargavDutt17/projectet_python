@@ -41,7 +41,7 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
             full_username = "UnknownUser"
                                   
 
-        # ✅ Convert string dates to datetime objects
+        # Convert string dates to datetime objects
         date_format = "%d/%m/%Y"
         if start_date and end_date:
             start_date_obj = datetime.strptime(start_date, date_format)
@@ -55,7 +55,7 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
         file_name = f"Transaction_Report_{full_username}_{date_range_label}.xlsx"
 
 
-        # ✅ Fetch transactions within the selected date range
+        # Fetch transactions within the selected date range
         transactions = await transactions_collection.find(
             {"user_id": user_id}
         ).sort("date", ASCENDING).to_list(None)
@@ -66,10 +66,10 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
 
         for t in transactions:
             try:
-                # ✅ Convert transaction date from string to datetime
+                # Convert transaction date from string to datetime
                 transaction_date_obj = datetime.strptime(t["date"], date_format)
 
-                # ✅ Filter transactions by selected date range
+                # Filter transactions by selected date range
                 if start_date_obj <= transaction_date_obj <= end_date_obj:
                     category = await category_collection.find_one({"_id": ObjectId(t["category_id"])})
                     sub_category = await sub_category_collection.find_one({"_id": ObjectId(t["subcategory_id"])})

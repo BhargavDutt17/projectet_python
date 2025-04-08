@@ -17,6 +17,13 @@ class User(BaseModel):
     @validator("password", pre=True, always=True)
     def encrypt_password(cls, v):
         return bcrypt.hashpw(v.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    
+    @validator("status")
+    def validate_status(cls, v):
+        allowed_statuses = ["active", "inactive", "pending_deactivation", "pending_deletion"]
+        if v not in allowed_statuses:
+            raise ValueError(f"Invalid status: {v}. Must be one of {allowed_statuses}")
+        return v
 
 class UserOut(User):
     id: str = Field(alias="_id")

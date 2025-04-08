@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Form, UploadFile, File
+from fastapi import APIRouter, Form, UploadFile, File,Request
 from controllers import UserController
 from models.UserModel import UserLogin
 from pydantic import BaseModel
+
 
 router = APIRouter()
 
@@ -70,3 +71,29 @@ async def update_user_password(user_id: str, data: UpdatePasswordModel):
 @router.put("/update-profile-picture/{user_id}")
 async def update_profile_picture(user_id: str, image: UploadFile): 
     return await UserController.update_profile_picture(user_id, image)
+
+# Route to deactivate a user (1-minute delay)
+@router.put("/deactivate-user/{user_id}")
+async def deactivate_user(user_id: str, password: str = Form(...), role: str = Form(...)):
+    return await UserController.deactivate_user(user_id, password, role)
+
+# Route to delete a user (1-minute delay)
+@router.delete("/delete-user/{user_id}")
+async def delete_user(user_id: str, password: str = Form(...), role: str = Form(...)):
+    return await UserController.delete_user(user_id, password, role)
+
+@router.put("/user/deactivate/{user_id}")
+async def deactivate_user(user_id: str, request: Request = None):
+    body = await request.json()
+    role = body.get("role")
+    password = body.get("password")  # Optional for admin
+
+    return await UserController.trigger_user_deactivation(user_id, role, password)
+
+@router.delete("/user/delete/{user_id}")
+async def delete_user(user_id: str, request: Request = None):
+    body = await request.json()
+    role = body.get("role")
+    password = body.get("password")  # Optional if admin
+
+    return await UserController.trigger_user_deletion(user_id, role, password)

@@ -6,7 +6,7 @@ from config.database import (
     sub_category_collection,
     category_collection,
 )
-from utils.FetchImage import fetch_image_url  # ✅ Import fetch_image_url
+from utils.FetchImage import fetch_image_url  #Import fetch_image_url
 
 async def get_ads(user_id: str, ad_type: str):
     user_expenses = {}
@@ -62,7 +62,7 @@ async def get_ads(user_id: str, ad_type: str):
             AdResponse(
                 title=title,
                 message="Discover how to grow your savings effectively.",
-                image_url=fetch_image_url(title)  # ✅ Fetch image dynamically
+                image_url=fetch_image_url(title)  # Fetch image dynamically
             )
             for title in investment_ad_templates
         ]
@@ -75,7 +75,7 @@ async def get_ads(user_id: str, ad_type: str):
                     AdResponse(
                         title=f"How to spend less on {subcategory}?",
                         message=f"Learn effective ways to reduce expenses on {subcategory} and save more!",
-                        image_url=fetch_image_url(f"reduce {subcategory} expenses")  # ✅ Fetch subcategory image
+                        image_url=fetch_image_url(f"reduce {subcategory} expenses")  # Fetch subcategory image
                     ),
                     AdResponse(
                         title=f"Top 5 tips to reduce {subcategory} spending",
