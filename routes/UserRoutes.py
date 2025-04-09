@@ -97,3 +97,15 @@ async def delete_user(user_id: str, request: Request = None):
     password = body.get("password")  # Optional if admin
 
     return await UserController.trigger_user_deletion(user_id, role, password)
+
+# Activate User Route
+class ActivateRequest(UserLogin):
+    role: str = None  # Optional role for admin-based activation
+
+@router.post("/users/activate")
+async def reactivate_account(request: ActivateRequest):
+    return await UserController.activateUser(request)
+
+@router.put("/user/cancel-delete/{user_id}")
+async def cancel_user_deletion(user_id: str):
+    return await UserController.cancel_user_deletion(user_id)

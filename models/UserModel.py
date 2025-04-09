@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from bson import ObjectId
 import bcrypt
 
+
 class User(BaseModel):
     firstName: str
     lastName: str
@@ -17,13 +18,19 @@ class User(BaseModel):
     @validator("password", pre=True, always=True)
     def encrypt_password(cls, v):
         return bcrypt.hashpw(v.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    
+
     @validator("status")
     def validate_status(cls, v):
-        allowed_statuses = ["active", "inactive", "pending_deactivation", "pending_deletion"]
+        allowed_statuses = [
+            "active",
+            "inactive",
+            "pending_deactivation",
+            "pending_deletion",
+        ]
         if v not in allowed_statuses:
             raise ValueError(f"Invalid status: {v}. Must be one of {allowed_statuses}")
         return v
+
 
 class UserOut(User):
     id: str = Field(alias="_id")
@@ -39,6 +46,8 @@ class UserOut(User):
             v["_id"] = str(v["_id"])
         return v
 
+
 class UserLogin(BaseModel):
     email_or_username: str  # Accepts either email or username
     password: str
+    role: Optional[str] = None  # Add this line
