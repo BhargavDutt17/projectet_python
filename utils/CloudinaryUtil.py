@@ -1,5 +1,6 @@
 import cloudinary
 from cloudinary.uploader import upload
+import time  # Add this import for generating unique filenames
 
 # Cloudinary Configuration
 cloudinary.config(
@@ -21,12 +22,15 @@ async def upload_file_from_object(file_stream, file_name, file_format="xlsx"):
     if file_format not in ["xlsx", "csv", "pdf", "txt"]:
         raise ValueError("Unsupported file format. Use 'xlsx', 'csv', 'pdf', or 'txt'.")
 
+    # Generate a unique suffix based on the current timestamp
+    unique_suffix = int(time.time())  # You can also use UUID for even more uniqueness
+
     result = upload(
         file_stream,
         resource_type="raw",  # Ensure it's uploaded as a file (not an image)
-        public_id=f"transaction_reports/{file_name}",  # Store in Cloudinary folder
+        public_id=f"transaction_reports/{file_name}_{unique_suffix}",  # Append the unique suffix to the filename
         format=file_format,
-        overwrite=True,  # Overwrite if the file already exists
+        overwrite=False,  # Do not overwrite if the file already exists
     )
 
     return result["secure_url"]

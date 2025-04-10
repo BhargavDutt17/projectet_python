@@ -49,12 +49,22 @@ async def generate_transaction_report(
             start_date_obj = datetime.strptime(start_date, date_format)
             end_date_obj = datetime.strptime(end_date, date_format)
             date_range_label = f"{start_date.replace('/', '-')}_to_{end_date.replace('/', '-')}"
+
         else:
             start_date_obj = datetime.strptime("01/01/2000", date_format)
             end_date_obj = datetime.now()
             date_range_label = "All_Transactions"
 
-        file_name = f"Transaction_Report_{full_username}_{date_range_label}.xlsx"
+        # Build the file name based on filters
+        filter_label = ""
+        if category_id:
+            category = await category_collection.find_one({"_id": ObjectId(category_id)})
+            filter_label += f"Category_{category['name']}_"
+        if subcategory_id:
+            subcategory = await sub_category_collection.find_one({"_id": ObjectId(subcategory_id)})
+            filter_label += f"SubCategory_{subcategory['name']}_"
+
+        file_name = f"Transaction_Report_{full_username}_{date_range_label}_{filter_label}xlsx"
 
         # Fetch all transactions for the user
         transactions = await transactions_collection.find({"user_id": user_id}).sort("date", ASCENDING).to_list(None)
@@ -138,8 +148,6 @@ async def generate_transaction_report(
     except Exception as e:
         return {"error": f"Error generating report: {str(e)}"}
 
-    
-    
 # Get Latest Transaction Report
 async def get_latest_transaction_report(user_id: str):
     try:
