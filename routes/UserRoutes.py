@@ -109,3 +109,24 @@ async def reactivate_account(request: ActivateRequest):
 @router.put("/user/cancel-delete/{user_id}")
 async def cancel_user_deletion(user_id: str):
     return await UserController.cancel_user_deletion(user_id)
+
+# USER REPORT ROUTES
+@router.post("/user-reports/generate")
+async def generate_report_with_filters(request: Request):
+    return await UserController.generate_user_report(request)
+
+@router.get("/user-reports/latest")
+async def get_latest_user_excel():
+    return await UserController.getLatestUserReport()
+
+@router.get("/user-reports/{report_id}")
+async def get_user_excel_by_id(report_id: str):
+    return await UserController.getUserReportById(report_id)
+
+@router.get("/user-reports/")
+async def get_all_user_excel_reports():
+    return await UserController.getAllUserReports()
+
+@router.delete("/user-reports/{report_id}")
+async def delete_user_excel_report(report_id: str):
+    return await UserController.deleteUserReport(report_id)

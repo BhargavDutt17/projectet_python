@@ -9,6 +9,13 @@ from utils.CloudinaryUtil import upload_image
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.base import JobLookupError
+from controllers.UserReportController import (
+    generate_user_report,
+    get_latest_user_report,
+    get_user_report_by_id,
+    get_all_user_reports,
+    delete_user_report
+)
 
 ADMIN_INVITE_CODE = "ADMIN123"
 scheduled_deletion_jobs, scheduled_deactivation_jobs = {}, {}
@@ -211,3 +218,20 @@ async def delete_user(user_id, email):
         user["status"] = "permanently_deleted"
         await deleted_user_collection.insert_one(user)
         await user_collection.delete_one({"_id": ObjectId(user_id)})
+
+# ---------------- USER REPORT FUNCTIONS ---------------- #
+
+async def generateUserReport():
+    return await generate_user_report()
+
+async def getLatestUserReport():
+    return await get_latest_user_report()
+
+async def getUserReportById(report_id: str):
+    return await get_user_report_by_id(report_id)
+
+async def getAllUserReports():
+    return await get_all_user_reports()
+
+async def deleteUserReport(report_id: str):
+    return await delete_user_report(report_id)

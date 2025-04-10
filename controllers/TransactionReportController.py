@@ -27,21 +27,23 @@ def auto_adjust_column_width(writer, df, sheet_name):
 
 
 # Generate Transaction Report and Upload Directly to Cloudinary
-async def generate_transaction_report(user_id: str, start_date: str = None, end_date: str = None):
+# Add optional filters to parameters
+async def generate_transaction_report(
+    user_id: str,
+    start_date: str = None,
+    end_date: str = None,
+    category_id: str = None,
+    subcategory_id: str = None
+):
     try:
         user = await user_collection.find_one({"_id": ObjectId(user_id)})
-
+        full_username = "UnknownUser"
         if user:
             first_name = user.get("firstName", "Unknown")
             last_name = user.get("lastName", "Unknown")
             username = user.get("username", "UnknownUser")
-
             full_username = f"{first_name}_{last_name} ({username})".replace(" ", "_")
-        else:
-            full_username = "UnknownUser"
-                                  
 
-        # Convert string dates to datetime objects
         date_format = "%d/%m/%Y"
         if start_date and end_date:
             start_date_obj = datetime.strptime(start_date, date_format)
@@ -54,46 +56,50 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
 
         file_name = f"Transaction_Report_{full_username}_{date_range_label}.xlsx"
 
-
-        # Fetch transactions within the selected date range
-        transactions = await transactions_collection.find(
-            {"user_id": user_id}
-        ).sort("date", ASCENDING).to_list(None)
+        # Fetch all transactions for the user
+        transactions = await transactions_collection.find({"user_id": user_id}).sort("date", ASCENDING).to_list(None)
 
         filtered_transactions = []
         total_income = 0
         total_expenses = 0
+        sr_no = 1
 
         for t in transactions:
             try:
-                # Convert transaction date from string to datetime
                 transaction_date_obj = datetime.strptime(t["date"], date_format)
 
-                # Filter transactions by selected date range
-                if start_date_obj <= transaction_date_obj <= end_date_obj:
-                    category = await category_collection.find_one({"_id": ObjectId(t["category_id"])})
-                    sub_category = await sub_category_collection.find_one({"_id": ObjectId(t["subcategory_id"])})
-                    amount = t["amount"]
+                if not (start_date_obj <= transaction_date_obj <= end_date_obj):
+                    continue
 
-                    if category and category["name"].lower() == "income":
-                        total_income += amount
-                    elif category and category["name"].lower() == "expense":
-                        total_expenses += amount
+                category = await category_collection.find_one({"_id": ObjectId(t["category_id"])})
+                sub_category = await sub_category_collection.find_one({"_id": ObjectId(t["subcategory_id"])})
 
-                    filtered_transactions.append({
-                        "Date": t["date"],
-                        "Type": category["name"] if category else "Unknown",
-                        "Category": sub_category["name"] if sub_category else "Unknown",
-                        "Amount": amount,
-                        "Note": t.get("description", ""),
-                    })
-            except ValueError:
-                continue  # Skip transactions with invalid date format
+                if category_id and str(category["_id"]) != category_id:
+                    continue
+                if subcategory_id and str(sub_category["_id"]) != subcategory_id:
+                    continue
+
+                amount = t["amount"]
+                if category and category["name"].lower() == "income":
+                    total_income += amount
+                elif category and category["name"].lower() == "expense":
+                    total_expenses += amount
+
+                filtered_transactions.append({
+                    "Sr. No.": sr_no,
+                    "Date": t["date"],
+                    "Type": category["name"] if category else "Unknown",
+                    "Category": sub_category["name"] if sub_category else "Unknown",
+                    "Amount": amount,
+                    "Note": t.get("description", "")
+                })
+                sr_no += 1
+            except Exception:
+                continue
 
         spent_percentage = (total_expenses / total_income * 100) if total_income else 0
         remaining_balance = total_income - total_expenses
 
-        # Save Excel Report to Memory (No Local File)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             transaction_df = pd.DataFrame(filtered_transactions)
@@ -104,19 +110,16 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
                 "Spent Percentage (%)": round(spent_percentage, 2),
                 "Remaining Balance": remaining_balance,
             }])
-
             transaction_df.to_excel(writer, sheet_name="UserReport", index=False)
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
-
             auto_adjust_column_width(writer, transaction_df, "UserReport")
             auto_adjust_column_width(writer, summary_df, "Summary")
-
             writer.close()
-        output.seek(0)
 
+        output.seek(0)
         cloudinary_url = await upload_file_from_object(output, file_name, "xlsx")
 
-        report_data = { 
+        await transaction_report_collection.insert_one({
             "user_id": user_id,
             "username": username,
             "start_date": start_date,
@@ -124,8 +127,7 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
             "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "report_file_url": cloudinary_url,
             "report_name": file_name,
-        }
-        await transaction_report_collection.insert_one(report_data)
+        })
 
         return {
             "message": "Transaction report generated successfully",
@@ -135,6 +137,7 @@ async def generate_transaction_report(user_id: str, start_date: str = None, end_
 
     except Exception as e:
         return {"error": f"Error generating report: {str(e)}"}
+
     
     
 # Get Latest Transaction Report

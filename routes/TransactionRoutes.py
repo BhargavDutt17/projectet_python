@@ -25,11 +25,12 @@ async def get_transaction_by_user_id(user_id: str, month: int = None, year: int 
 
 # Report Generation Endpoint
 @router.post("/generateTransactionReport")
-async def generate_transaction_report(user_id: str, start_date: str, end_date: str):
+async def generate_transaction_report(
+    user_id: str,start_date: str = "",end_date: str = "",category_id: str = "",subcategory_id: str = ""
+):
     return await TransactionController.generateTransactionReport(
-        user_id, start_date, end_date
+        user_id, start_date, end_date, category_id, subcategory_id
     )
-
 
 # Get Specific Report by `report_id`
 @router.get("/getTransactionReport/{report_id}")

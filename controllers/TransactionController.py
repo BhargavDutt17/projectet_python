@@ -193,8 +193,9 @@ async def deleteTransaction(transaction_id: str, user_id: str = None):
 
 
 # Add Transaction Report Functions Inside TransactionController
-async def generateTransactionReport(user_id: str, start_date: str, end_date: str):
-    return await generate_transaction_report(user_id, start_date, end_date)
+
+async def generateTransactionReport(user_id: str,start_date: str,end_date: str,category_id: str = None,subcategory_id: str = None,):
+    return await generate_transaction_report(user_id, start_date, end_date, category_id, subcategory_id)
 
 async def getTransactionReport(report_id: str):
     return await get_transaction_report(report_id)
