@@ -11,9 +11,11 @@ async def post_sub_category(sub_cat: SubCategory):
 
 
 @router.get("/getAllSubCategories")
-async def get_all_sub_categories():
-    return await SubCategoryController.getAllSubCategories()
-
+async def get_all_sub_categories(
+    user_id: str = Query(None, description="User ID"),
+    role_id: str = Query(None, description="Role ID"),
+):
+    return await SubCategoryController.getAllSubCategories(user_id, role_id)
 
 @router.get("/getSubCategoryByCategoryId/{category_id}")
 async def get_sub_category_by_category_id(

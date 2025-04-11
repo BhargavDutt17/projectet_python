@@ -42,10 +42,23 @@ async def addSubCategory(sub_category: SubCategory):
             status_code=500, detail=f"Error adding subcategory: {str(e)}"
         )
 
-
-async def getAllSubCategories():
+async def getAllSubCategories(user_id: str = None, role_id: str = None):
     try:
-        subCategories = await sub_category_collection.find().to_list(None)
+        query = {}
+
+        role_name = "user"
+        if role_id:
+            role = await role_collection.find_one({"_id": ObjectId(role_id)})
+            if role:
+                role_name = role["name"].lower()
+
+        # ✅ Only fetch admin-created subcategories if the role is admin
+        if role_name == "admin":
+            query["role_name"] = "admin"
+        else:
+            query["user_id"] = ObjectId(user_id)
+
+        subCategories = await sub_category_collection.find(query).to_list(None)
 
         for subCat in subCategories:
             subCat["_id"] = str(subCat["_id"])
@@ -54,7 +67,6 @@ async def getAllSubCategories():
             )
             subCat["category_id"] = str(subCat["category_id"])
 
-            # Fetch User Details (Admin or Regular User)
             user = (
                 await user_collection.find_one({"_id": ObjectId(subCat["user_id"])})
                 if subCat["user_id"]
@@ -62,13 +74,11 @@ async def getAllSubCategories():
             )
             subCat["user_id"] = user if user else None
 
-            # Fetch Category Details
             category = await category_collection.find_one(
                 {"_id": ObjectId(subCat["category_id"])}
             )
             subCat["category_id"] = category if category else None
 
-            # Fetch Role Details & Convert `role_id` to Dictionary
             if subCat.get("role_id"):
                 role = await role_collection.find_one(
                     {"_id": ObjectId(subCat["role_id"])}
@@ -77,10 +87,9 @@ async def getAllSubCategories():
                     {"_id": str(role["_id"]), "name": role["name"]} if role else None
                 )
             else:
-                subCat["role_id"] = None  # Prevents validation error
+                subCat["role_id"] = None
 
-            # Ensure `role_name` is assigned
-            subCat["role_name"] = role["name"].lower() if role else "user"
+            subCat["role_name"] = subCat.get("role_name", "user")
 
         return [SubCategoryOut(**subCat) for subCat in subCategories]
 
@@ -88,6 +97,7 @@ async def getAllSubCategories():
         raise HTTPException(
             status_code=500, detail=f"Error fetching all subcategories: {str(e)}"
         )
+
 
 
 async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = None, role_id: Optional[str] = None):
