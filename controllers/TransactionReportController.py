@@ -5,29 +5,119 @@ from datetime import datetime
 from pymongo import ASCENDING
 from bson import ObjectId, errors
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 from config.database import (
     transactions_collection,
     transaction_report_collection,
     category_collection,
     sub_category_collection,
-    user_collection,  # Fetch username from MongoDB
+    user_collection,
 )
 from utils.CloudinaryUtil import upload_file_from_object
 
-# Set India Standard Time (IST)
 india_tz = pytz.timezone("Asia/Kolkata")
 
 
 def auto_adjust_column_width(writer, df, sheet_name):
-    """Auto-adjusts column width for an Excel sheet."""
     worksheet = writer.sheets[sheet_name]
     for i, col in enumerate(df.columns):
         max_length = max(df[col].astype(str).map(len).max(), len(col)) + 2
         worksheet.set_column(i, i, max_length)
 
 
-# Generate Transaction Report and Upload Directly to Cloudinary
-# Add optional filters to parameters
+# ✅ Admin version: Generate report and return as downloadable Excel file
+async def generate_transaction_report_for_admin(
+    user_id: str,
+    start_date: str = None,
+    end_date: str = None,
+    category_id: str = None,
+    subcategory_id: str = None
+):
+    try:
+        user = await user_collection.find_one({"_id": ObjectId(user_id)})
+        username = user.get("username", "UnknownUser") if user else "UnknownUser"
+
+        date_format = "%d/%m/%Y"
+        if start_date and end_date:
+            start_date_obj = datetime.strptime(start_date, date_format)
+            end_date_obj = datetime.strptime(end_date, date_format)
+            date_range_label = f"{start_date.replace('/', '-')}_to_{end_date.replace('/', '-')}"
+        else:
+            start_date_obj = datetime.strptime("01/01/2000", date_format)
+            end_date_obj = datetime.now()
+            date_range_label = "All_Transactions"
+
+        transactions = await transactions_collection.find({"user_id": user_id}).sort("date", ASCENDING).to_list(None)
+
+        filtered_transactions = []
+        total_income = 0
+        total_expenses = 0
+        sr_no = 1
+
+        for t in transactions:
+            try:
+                transaction_date_obj = datetime.strptime(t["date"], date_format)
+
+                if not (start_date_obj <= transaction_date_obj <= end_date_obj):
+                    continue
+
+                category = await category_collection.find_one({"_id": ObjectId(t["category_id"])})
+                sub_category = await sub_category_collection.find_one({"_id": ObjectId(t["subcategory_id"])})
+
+                if category_id and str(category["_id"]) != category_id:
+                    continue
+                if subcategory_id and str(sub_category["_id"]) != subcategory_id:
+                    continue
+
+                amount = t["amount"]
+                if category and category["name"].lower() == "income":
+                    total_income += amount
+                elif category and category["name"].lower() == "expense":
+                    total_expenses += amount
+
+                filtered_transactions.append({
+                    "Sr. No.": sr_no,
+                    "Date": t["date"],
+                    "Type": category["name"] if category else "Unknown",
+                    "Category": sub_category["name"] if sub_category else "Unknown",
+                    "Amount": amount,
+                    "Note": t.get("description", "")
+                })
+                sr_no += 1
+            except Exception:
+                continue
+
+        spent_percentage = (total_expenses / total_income * 100) if total_income else 0
+        remaining_balance = total_income - total_expenses
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            transaction_df = pd.DataFrame(filtered_transactions)
+            summary_df = pd.DataFrame([{
+                "Username": username,
+                "Total Income": total_income,
+                "Total Expenses": total_expenses,
+                "Spent Percentage (%)": round(spent_percentage, 2),
+                "Remaining Balance": remaining_balance,
+            }])
+            transaction_df.to_excel(writer, sheet_name="UserReport", index=False)
+            summary_df.to_excel(writer, sheet_name="Summary", index=False)
+            auto_adjust_column_width(writer, transaction_df, "UserReport")
+            auto_adjust_column_width(writer, summary_df, "Summary")
+            writer.close()
+
+        output.seek(0)
+        file_name = f"{username}_Report_{date_range_label}.xlsx"
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={file_name}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating admin report: {str(e)}")
+
+
+# ✅ Existing: User report generation with Cloudinary upload
 async def generate_transaction_report(
     user_id: str,
     start_date: str = None,
@@ -49,24 +139,21 @@ async def generate_transaction_report(
             start_date_obj = datetime.strptime(start_date, date_format)
             end_date_obj = datetime.strptime(end_date, date_format)
             date_range_label = f"{start_date.replace('/', '-')}_to_{end_date.replace('/', '-')}"
-
         else:
             start_date_obj = datetime.strptime("01/01/2000", date_format)
             end_date_obj = datetime.now()
             date_range_label = "All_Transactions"
 
-        # Build the file name based on filters
         filter_label = ""
         if category_id:
             category = await category_collection.find_one({"_id": ObjectId(category_id)})
             filter_label += f"Category_{category['name']}_"
         if subcategory_id:
             subcategory = await sub_category_collection.find_one({"_id": ObjectId(subcategory_id)})
-            filter_label += f"SubCategory_{subcategory['name']}_"
+            filter_label += f"SubCategory_{subcategory['name']}_"    
 
         file_name = f"Transaction_Report_{full_username}_{date_range_label}_{filter_label}xlsx"
 
-        # Fetch all transactions for the user
         transactions = await transactions_collection.find({"user_id": user_id}).sort("date", ASCENDING).to_list(None)
 
         filtered_transactions = []
@@ -148,7 +235,8 @@ async def generate_transaction_report(
     except Exception as e:
         return {"error": f"Error generating report: {str(e)}"}
 
-# Get Latest Transaction Report
+
+# ✅ Other helper functions remain unchanged
 async def get_latest_transaction_report(user_id: str):
     try:
         latest_report = await transaction_report_collection.find_one(
@@ -163,15 +251,11 @@ async def get_latest_transaction_report(user_id: str):
         return {"error": str(e)}
 
 
-# Function to get the report download link
 async def get_transaction_report(report_id: str):
     try:
-        report = await transaction_report_collection.find_one(
-            {"_id": ObjectId(report_id)}
-        )
+        report = await transaction_report_collection.find_one({"_id": ObjectId(report_id)})
         if not report:
             raise Exception("Report not found")
-
         return {"report_file_url": report["report_file_url"]}
     except Exception as e:
         return {"error": str(e)}
@@ -179,41 +263,25 @@ async def get_transaction_report(report_id: str):
 
 async def get_all_transaction_reports(user_id: str):
     try:
-        reports = await transaction_report_collection.find(
-            {"user_id": user_id}
-        ).to_list(None)
-        if not reports:
-            return {"message": "No reports found", "reports": []}
-
+        reports = await transaction_report_collection.find({"user_id": user_id}).to_list(None)
         for report in reports:
-            report["_id"] = str(report["_id"])  # Convert ObjectId to string
-
+            report["_id"] = str(report["_id"])
         return {"reports": reports}
-
     except Exception as e:
         return {"error": str(e)}
 
-async def delete_transaction_report(report_id: str):
-    
-    try:
-        # Validate report_id format
-        try:
-            report_object_id = ObjectId(report_id)
-        except errors.InvalidId:
-            raise HTTPException(status_code=400, detail="Invalid report ID format")
 
-        # Find report in the database
+async def delete_transaction_report(report_id: str):
+    try:
+        report_object_id = ObjectId(report_id)
         report = await transaction_report_collection.find_one({"_id": report_object_id})
-        
         if not report:
             raise HTTPException(status_code=404, detail="Report not found")
-
-        # Delete the report
         await transaction_report_collection.delete_one({"_id": report_object_id})
-
         return {"message": "Transaction report deleted successfully"}
-    
+    except errors.InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid report ID format")
     except HTTPException as http_exc:
-        raise http_exc  # Re-raise specific HTTP exceptions
-    except Exception as e:
+        raise http_exc
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal server error")

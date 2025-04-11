@@ -36,6 +36,18 @@ async def generate_transaction_report(
         user_id, start_date, end_date, category_id, subcategory_id
     )
 
+@router.get("/admin/generateTransactionReport")
+async def admin_generate_transaction_report(
+    user_id: str,
+    start_date: str = "",
+    end_date: str = "",
+    category_id: str = "",
+    subcategory_id: str = ""
+):
+    return await TransactionController.generateTransactionReportForAdmin(
+        user_id, start_date, end_date, category_id, subcategory_id
+    )
+
 
 
 # Get Specific Report by `report_id`
@@ -75,3 +87,7 @@ async def edit_transaction(
     # Convert Pydantic model to dictionary and remove unset values (None)
     update_dict = updated_data.dict(exclude_unset=True)
     return await TransactionController.editTransaction(transaction_id, update_dict)
+
+@router.get("/admin/getTransactionsByUserSearch")
+async def get_transactions_by_user_search(q: str):
+    return await TransactionController.getTransactionsByUserSearch(q)

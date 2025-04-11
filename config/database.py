@@ -14,4 +14,4 @@ transactions_collection = db["transaction"]
 transaction_report_collection = db["transactions_report"]
 deleted_user_collection = db["deletedusers"]
 user_report_collection = db["user_reports"]
-
+admin_transaction_report_collection =db["admin_transaction_reports"]

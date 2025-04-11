@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Form, UploadFile, File,Request
+from fastapi import APIRouter, Form, UploadFile, File,Request,HTTPException
 from controllers import UserController
 from models.UserModel import UserLogin
 from pydantic import BaseModel
-
+from config.database import user_collection
 
 router = APIRouter()
 
@@ -130,3 +130,26 @@ async def get_all_user_excel_reports():
 @router.delete("/user-reports/{report_id}")
 async def delete_user_excel_report(report_id: str):
     return await UserController.deleteUserReport(report_id)
+
+
+def convert_objectid_to_str(user):
+    user["_id"] = str(user["_id"])
+    if "role" in user and "_id" in user["role"]:
+        user["role"]["_id"] = str(user["role"]["_id"])
+    return user
+
+@router.get("/getUserByQuery")
+async def get_user_by_query(search: str):
+    try:
+        query = {
+            "$or": [
+                {"username": {"$regex": search, "$options": "i"}},
+                {"email": {"$regex": search, "$options": "i"}},
+                {"firstName": {"$regex": search, "$options": "i"}},
+                {"lastName": {"$regex": search, "$options": "i"}},
+            ]
+        }
+        users = await user_collection.find(query).to_list(length=10)
+        return [convert_objectid_to_str(u) for u in users]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

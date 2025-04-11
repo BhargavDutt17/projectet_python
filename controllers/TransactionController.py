@@ -13,7 +13,8 @@ from controllers.TransactionReportController import (
     get_transaction_report,
     get_latest_transaction_report,
     get_all_transaction_reports,
-    delete_transaction_report
+    delete_transaction_report,
+    generate_transaction_report_for_admin
 )
 from datetime import datetime
 
@@ -205,6 +206,11 @@ async def generateTransactionReport(
     return await generate_transaction_report(user_id, start_date, end_date, category_id, subcategory_id)
 
 
+async def generateTransactionReportForAdmin(user_id, start_date, end_date, category_id, subcategory_id):
+    return await generate_transaction_report_for_admin(user_id, start_date, end_date, category_id, subcategory_id)
+
+
+
 async def getTransactionReport(report_id: str):
     return await get_transaction_report(report_id)
 
@@ -217,3 +223,23 @@ async def getAllTransactionReports(user_id: str):
 async def deleteTransactionReport(report_id: str):
     # Call a properly defined function instead of itself
     return await delete_transaction_report(report_id)
+
+async def getTransactionsByUserSearch(query: str):
+    try:
+        user = await user_collection.find_one({
+            "$or": [
+                {"username": {"$regex": query, "$options": "i"}},
+                {"email": {"$regex": query, "$options": "i"}},
+                {"firstName": {"$regex": query, "$options": "i"}},
+                {"lastName": {"$regex": query, "$options": "i"}}
+            ]
+        })
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        user_id = str(user["_id"])
+        return await getTransactionByUserId(user_id)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
