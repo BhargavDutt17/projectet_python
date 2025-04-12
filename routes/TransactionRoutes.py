@@ -72,12 +72,13 @@ async def get_all_transaction_reports(user_id: str):
 async def delete_transaction_report(report_id: str):
     return await TransactionController.delete_transaction_report(report_id)
 
+@router.delete("/all-transaction-reports/{user_id}")
+async def delete_all_transaction_reports(user_id: str):
+    return await TransactionController.delete_all_transaction_reports(user_id)
 
 @router.delete("/deleteTransaction/{transaction_id}")
 async def delete_transaction(transaction_id: str, user_id: Optional[str] = None):
     return await TransactionController.deleteTransaction(transaction_id, user_id)
-
-from typing import Dict
 
 @router.put("/editTransaction/{transaction_id}")
 async def edit_transaction(

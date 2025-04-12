@@ -14,6 +14,7 @@ class User(BaseModel):
     role_id: str = ""
     status: str = "active"
     profile_image: Optional[str] = None  # Profile image URL
+    public_id:Optional[str]=None
 
     @validator("password", pre=True, always=True)
     def encrypt_password(cls, v):

@@ -14,7 +14,8 @@ from controllers.TransactionReportController import (
     get_latest_transaction_report,
     get_all_transaction_reports,
     delete_transaction_report,
-    generate_transaction_report_for_admin
+    generate_transaction_report_for_admin,
+    delete_all_transaction_reports
 )
 from datetime import datetime
 
@@ -243,3 +244,6 @@ async def getTransactionsByUserSearch(query: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+
+async def deletealltransactionreports(user_id: str):
+    return await delete_all_transaction_reports(user_id)

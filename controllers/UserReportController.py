@@ -6,6 +6,8 @@ from fastapi import HTTPException
 from bson import ObjectId, errors
 from utils.CloudinaryUtil import upload_file_from_object
 from fastapi import Request
+import re
+from cloudinary.uploader import destroy  
 
 india_tz = pytz.timezone("Asia/Kolkata")
 
@@ -42,12 +44,10 @@ async def generate_user_report(request: Request):
             if selected_status != "all" and user.get("status") != selected_status:
                 continue
             if search_term:
-                full_text = " ".join([
-                    user.get("firstName", ""),
-                    user.get("lastName", ""),
-                    user.get("username", ""),
-                    user.get("email", "")
-                ]).lower()
+                full_text = " ".join([user.get("firstName", ""),
+                                      user.get("lastName", ""),
+                                      user.get("username", ""),
+                                      user.get("email", "")]).lower()
                 if search_term not in full_text:
                     continue
 
@@ -64,21 +64,24 @@ async def generate_user_report(request: Request):
         df = pd.DataFrame(rows)
         output = io.BytesIO()
 
-        file_name = f"User_Report_{datetime.now().strftime('%d-%m-%Y_%H-%M-%S')}.xlsx"
+        file_name = "User_Report"  # Let Cloudinary handle timestamping
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             df.to_excel(writer, sheet_name="User Report", index=False)
             auto_adjust_column_width(writer, df, "User Report")
-            writer.close()
 
         output.seek(0)
-        cloudinary_url = await upload_file_from_object(output, file_name, "xlsx")
+        uploaded_info = await upload_file_from_object(output, file_name, "xlsx")
+        cloudinary_url = uploaded_info["secure_url"]
+        public_id = uploaded_info["public_id"]  # Ensure public_id is returned here
+        final_file_name = public_id.split("/")[-1] + ".xlsx"
 
         report_data = {
             "username": "admin",
             "user_id": "admin",
             "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "report_file_url": cloudinary_url,
-            "report_name": file_name,
+            "report_name": final_file_name,
+            "public_id": public_id  # Ensure public_id is stored here in the DB
         }
 
         await user_report_collection.insert_one(report_data)
@@ -86,12 +89,11 @@ async def generate_user_report(request: Request):
         return {
             "message": "User report generated successfully",
             "report_file_url": cloudinary_url,
-            "report_name": file_name
+            "report_name": final_file_name
         }
 
     except Exception as e:
         return {"error": f"Error generating user report: {str(e)}"}
-
 
 
 async def get_latest_user_report():
@@ -126,3 +128,39 @@ async def delete_user_report(report_id: str):
         raise HTTPException(status_code=404, detail="Report not found")
 
     return {"message": "User report deleted successfully"}
+
+from cloudinary.uploader import destroy
+
+async def delete_all_user_reports():
+    reports = await user_report_collection.find().to_list(None)
+
+    for report in reports:
+        file_url = report.get("report_file_url", "")
+        public_id = report.get("public_id", "")  # Ensure we're getting the correct public_id
+
+        if not public_id:
+            print(f"❌ No public_id found for the report")
+            continue
+
+        print(f"Attempting to delete Cloudinary public_id: {public_id}")
+
+        try:
+            # Delete the file from Cloudinary using the exact public_id stored
+            result = destroy(public_id, resource_type="raw")  # Ensure resource_type is 'raw'
+            print(f"Cloudinary delete result: {result}")
+
+            if result.get('result') != 'ok':
+                print(f"❌ Failed to delete file from Cloudinary: {result}")
+            else:
+                print(f"✅ Successfully deleted file from Cloudinary")
+        except Exception as e:
+            print(f"Error deleting from Cloudinary: {str(e)}")
+
+        # Delete the report entry from DB
+        deleted = await user_report_collection.delete_one({"_id": report["_id"]})
+        if deleted.deleted_count == 0:
+            print(f"❌ Failed to delete report from MongoDB")
+        else:
+            print(f"✅ Successfully deleted report from MongoDB")
+
+    return {"message": f"{len(reports)} report(s) deleted successfully"}

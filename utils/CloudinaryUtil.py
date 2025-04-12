@@ -1,6 +1,7 @@
 import cloudinary
-from cloudinary.uploader import upload
+from cloudinary.uploader import upload,destroy
 import time  # Add this import for generating unique filenames
+from fastapi import HTTPException
 
 # Cloudinary Configuration
 cloudinary.config(
@@ -11,10 +12,27 @@ cloudinary.config(
 
 
 # Upload image (for profile pictures, products, etc.)
+# cloudinaryutil.py
+
 async def upload_image(image):
-    image_bytes = await image.read()  # Await the coroutine to read the file
-    result = upload(image_bytes, resource_type="image")  # Now `image_bytes` is readable
-    return result["secure_url"]
+    try:
+        image_bytes = await image.read()  # Await the coroutine to read the file
+        result = upload(image_bytes, resource_type="image")  # Upload the image to Cloudinary
+        return {
+            "secure_url": result["secure_url"],
+            "public_id": result["public_id"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+
+async def delete_image(public_id: str):
+    try:
+        result = destroy(public_id)
+        return result
+    except Exception as e:
+        print(f"Error deleting image: {e}")
+        return None
+
 
 
 # Upload a file directly from memory (For Reports)
@@ -33,4 +51,16 @@ async def upload_file_from_object(file_stream, file_name, file_format="xlsx"):
         overwrite=False,  # Do not overwrite if the file already exists
     )
 
-    return result["secure_url"]
+    # Store the exact public_id as it is used for deletion
+    return {
+        "secure_url": result["secure_url"],
+        "public_id": result["public_id"]
+    }
+
+async def delete_file(public_id: str):
+    try:
+        result = destroy(public_id, resource_type="raw")
+        return result
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+        return None

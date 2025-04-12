@@ -13,7 +13,7 @@ from config.database import (
     sub_category_collection,
     user_collection,
 )
-from utils.CloudinaryUtil import upload_file_from_object
+from utils.CloudinaryUtil import upload_file_from_object,delete_file
 
 india_tz = pytz.timezone("Asia/Kolkata")
 
@@ -118,6 +118,7 @@ async def generate_transaction_report_for_admin(
 
 
 # ✅ Existing: User report generation with Cloudinary upload
+# ✅ Updated: User report generation with Cloudinary upload (including public_id)
 async def generate_transaction_report(
     user_id: str,
     start_date: str = None,
@@ -214,7 +215,11 @@ async def generate_transaction_report(
             writer.close()
 
         output.seek(0)
-        cloudinary_url = await upload_file_from_object(output, file_name, "xlsx")
+        cloudinary_result = await upload_file_from_object(output, file_name, "xlsx")
+
+        # Store the Cloudinary URL and public_id in the report document in the database
+        cloudinary_url = cloudinary_result["secure_url"]
+        public_id = cloudinary_result["public_id"]
 
         await transaction_report_collection.insert_one({
             "user_id": user_id,
@@ -223,6 +228,7 @@ async def generate_transaction_report(
             "end_date": end_date,
             "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "report_file_url": cloudinary_url,
+            "public_id": public_id,  # Store the public_id
             "report_name": file_name,
         })
 
@@ -230,11 +236,12 @@ async def generate_transaction_report(
             "message": "Transaction report generated successfully",
             "report_file_url": cloudinary_url,
             "report_name": file_name,
+            "public_id": public_id  # Include the public_id in the response
         }
 
     except Exception as e:
         return {"error": f"Error generating report: {str(e)}"}
-
+    
 
 # ✅ Other helper functions remain unchanged
 async def get_latest_transaction_report(user_id: str):
@@ -275,13 +282,57 @@ async def delete_transaction_report(report_id: str):
     try:
         report_object_id = ObjectId(report_id)
         report = await transaction_report_collection.find_one({"_id": report_object_id})
+        
         if not report:
             raise HTTPException(status_code=404, detail="Report not found")
+        
+        public_id = report.get("public_id")
+        if not public_id:
+            raise HTTPException(status_code=400, detail="No public_id found for the report")
+        
+        # Use the cloudinary util for deleting file
+        result = await delete_file(public_id)
+
+        if result.get('result') != 'ok':
+            raise HTTPException(status_code=500, detail=f"Failed to delete file from Cloudinary: {result}")
+        
         await transaction_report_collection.delete_one({"_id": report_object_id})
-        return {"message": "Transaction report deleted successfully"}
+        return {"message": "Transaction report and associated file deleted successfully"}
+    
     except errors.InvalidId:
         raise HTTPException(status_code=400, detail="Invalid report ID format")
     except HTTPException as http_exc:
         raise http_exc
-    except Exception:
+    except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+async def delete_all_transaction_reports(user_id: str):
+    # Fetch all reports created by this specific user
+    reports = await transaction_report_collection.find({"user_id": user_id}).to_list(None)
+
+    for report in reports:
+        public_id = report.get("public_id", "")
+        if not public_id:
+            print(f"❌ No public_id found for the report")
+            continue
+
+        print(f"Attempting to delete Cloudinary public_id: {public_id}")
+
+        try:
+            result = await delete_file(public_id)
+            print(f"Cloudinary delete result: {result}")
+
+            if result.get('result') != 'ok':
+                print(f"❌ Failed to delete file from Cloudinary: {result}")
+            else:
+                print(f"✅ Successfully deleted file from Cloudinary")
+        except Exception as e:
+            print(f"Error deleting from Cloudinary: {str(e)}")
+
+        deleted = await transaction_report_collection.delete_one({"_id": report["_id"]})
+        if deleted.deleted_count == 0:
+            print(f"❌ Failed to delete report from MongoDB")
+        else:
+            print(f"✅ Successfully deleted report from MongoDB")
+
+    return {"message": f"{len(reports)} report(s) for user {user_id} deleted successfully"}

@@ -110,6 +110,10 @@ async def reactivate_account(request: ActivateRequest):
 async def cancel_user_deletion(user_id: str):
     return await UserController.cancel_user_deletion(user_id)
 
+@router.delete("/users/delete-profile-image/{user_id}")
+async def delete_profile_image(user_id: str):
+    return await UserController.delete_profile_picture(user_id)
+
 # USER REPORT ROUTES
 @router.post("/user-reports/generate")
 async def generate_report_with_filters(request: Request):
@@ -153,3 +157,9 @@ async def get_user_by_query(search: str):
         return [convert_objectid_to_str(u) for u in users]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/user-reports/")
+async def delete_all_user_excel_reports():
+    return await UserController.deletealluserreports()
+

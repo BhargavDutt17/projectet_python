@@ -5,7 +5,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 import bcrypt, asyncio
 from utils.SendMail import send_mail
-from utils.CloudinaryUtil import upload_image
+from utils.CloudinaryUtil import upload_image,delete_image
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.base import JobLookupError
@@ -14,7 +14,8 @@ from controllers.UserReportController import (
     get_latest_user_report,
     get_user_report_by_id,
     get_all_user_reports,
-    delete_user_report
+    delete_user_report,
+    delete_all_user_reports
 )
 
 ADMIN_INVITE_CODE = "ADMIN123"
@@ -30,17 +31,20 @@ async def addUser(firstName, lastName, username, email, password, inviteCode, st
     if not role:
         raise HTTPException(status_code=500, detail="Role not found in database")
 
-    image_url = await upload_image(profile_image) if profile_image else None
+    image_info = await upload_image(profile_image) if profile_image else None
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     await user_collection.insert_one({
         "firstName": firstName, "lastName": lastName, "username": username, "email": email,
         "password": hashed_password, "inviteCode": inviteCode, "role_id": role["_id"],
-        "status": status, "profile_image": image_url
+        "status": status,
+        "profile_image": image_info["secure_url"] if image_info else None,
+        "public_id": image_info["public_id"] if image_info else None
     })
 
     send_mail(email, "User Created", "User created successfully")
     return JSONResponse(status_code=201, content={"message": "User created successfully"})
+
 
 
 async def getAllUsers():
@@ -58,14 +62,69 @@ async def getUserProfile(user_id):
         raise HTTPException(status_code=404, detail="User not found")
     return {"username": user["username"], "email": user["email"], "profile_image": user.get("profile_image")}
 
+async def update_profile_picture(user_id, image: UploadFile):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Delete old image if it exists
+    old_public_id = user.get("public_id")
+    if old_public_id:
+        await delete_image(old_public_id)
+
+    # Upload new image
+    image_info = await upload_image(image)
+
+    #  Update user document with new image info
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "profile_image": image_info["secure_url"],
+                "public_id": image_info["public_id"]
+            }
+        }
+    )
+
+    return {
+        "message": "Profile picture updated successfully",
+        "profile_image": image_info["secure_url"]
+    }
+
+async def delete_profile_picture(user_id: str):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    public_id = user.get("public_id")
+    if public_id:
+        await delete_image(public_id)  # Deletes from Cloudinary
+
+    # Remove profile image fields from DB
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$unset": {"profile_image": "", "public_id": ""}}
+    )
+
+    return {"message": "Profile picture deleted successfully"}
+
 
 async def uploadUserProfileImage(user_id, image: UploadFile):
     user = await user_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    image_url = await upload_image(image)
-    await user_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"profile_image": image_url}})
-    return JSONResponse(status_code=200, content={"message": "Profile image updated", "profile_image": image_url})
+        raise HTTPException(status_code=404, detail="User  not found")
+    image_info = await upload_image(image)
+    await user_collection.update_one(
+    {"_id": ObjectId(user_id)},
+    {
+        "$set": {
+            "profile_image": image_info["secure_url"],
+            "public_id": image_info["public_id"]
+        }
+    }
+    )
+    return JSONResponse(status_code=200, content={"message": "Profile image updated", "profile_image": image_info["secure_url"]})
+
 
 # -------------------------- LOGIN & AUTH -------------------------- #
 
@@ -235,3 +294,6 @@ async def getAllUserReports():
 
 async def deleteUserReport(report_id: str):
     return await delete_user_report(report_id)
+
+async def deletealluserreports():
+    return await delete_all_user_reports()
