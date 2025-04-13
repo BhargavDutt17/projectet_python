@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Form, UploadFile, File,Request,HTTPException
 from controllers import UserController
-from models.UserModel import UserLogin
+from models.UserModel import UserLogin, ResetPasswordReq
 from pydantic import BaseModel
 from config.database import user_collection
 
@@ -162,4 +162,18 @@ async def get_user_by_query(search: str):
 @router.delete("/user-reports/")
 async def delete_all_user_excel_reports():
     return await UserController.deletealluserreports()
+
+# @router.post("/users/forgotpassword/")
+# async def forgot_password(email: str = Form(...)):
+#     print("EMAIL RECEIVED:", email)
+#     return await UserController.forgotPassword(email)
+
+@router.post("/users/resetpassword/")
+async def reset_password(data: ResetPasswordReq):
+    return await UserController.resetPassword(data)
+
+@router.post("/forgotpassword")
+async def forgot_password(email: str):  # comes from ?email=
+    print("EMAIL RECEIVED:", email)
+    return await UserController.forgotPassword(email)
 

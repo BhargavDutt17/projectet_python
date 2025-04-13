@@ -52,3 +52,7 @@ class UserLogin(BaseModel):
     email_or_username: str  # Accepts either email or username
     password: str
     role: Optional[str] = None  # Add this line
+
+class ResetPasswordReq(BaseModel):
+    token: str
+    password: str
