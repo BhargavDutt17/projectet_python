@@ -1,8 +1,9 @@
 from models.CategoryModel import Category,CategoryOut
 from bson import ObjectId
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,HTTPException,Body
 from fastapi.responses import JSONResponse
 from config.database import category_collection
+from typing import List
 
 async def addCategory(category:Category):
     savedCategory = await category_collection.insert_one(category.dict())
@@ -26,6 +27,32 @@ async def deleteCategory(category_id: str):
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from bson import ObjectId
+
+# Delete selected categories by IDs
+
+async def deleteSelectedCategories(category_ids: List[str]):
+    # Validation and deletion logic
+
+    if not all(ObjectId.is_valid(category_id) for category_id in category_ids):
+        raise HTTPException(status_code=400, detail="Invalid category IDs")
+
+    object_ids = [ObjectId(category_id) for category_id in category_ids]
+    result = await category_collection.delete_many({"_id": {"$in": object_ids}})
+
+    if result.deleted_count > 0:
+        return JSONResponse(content={"message": f"{result.deleted_count} categories deleted successfully"}, status_code=200)
+    else:
+        raise HTTPException(status_code=404, detail="No categories found to delete")
+
+
+# Delete all categories
+async def deleteAllCategories():
+    result = await category_collection.delete_many({})
+
+    if result.deleted_count > 0:
+        return JSONResponse(content={"message": "All categories deleted successfully"}, status_code=200)
+    else:
+        raise HTTPException(status_code=404, detail="No categories found to delete")
 
 async def updateCategory(category_id: str, updated_data: dict):
     try:

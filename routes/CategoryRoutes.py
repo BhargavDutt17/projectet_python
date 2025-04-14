@@ -1,6 +1,8 @@
 from fastapi import APIRouter,Body
 from models.CategoryModel import Category
 from controllers import CategoryController
+from typing import List
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -15,6 +17,17 @@ async def get_all_categories():
 @router.delete("/deleteCategory/{category_id}")
 async def delete_category(category_id: str):
     return await CategoryController.deleteCategory(category_id)
+
+class CategoryDeleteRequest(BaseModel):
+    category_ids: List[str]
+
+@router.post("/delete-selected-categories")
+async def delete_selected_categories(payload: CategoryDeleteRequest):
+    return await CategoryController.deleteSelectedCategories(payload.category_ids)
+
+@router.delete("/delete-all-categories")
+async def delete_all_categories():
+    return await CategoryController.deleteAllCategories()
 
 
 @router.put("/updateCategory/{category_id}")

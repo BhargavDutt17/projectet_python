@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional,List
 
 
 class TransactionReport(BaseModel):
@@ -12,3 +12,7 @@ class TransactionReport(BaseModel):
     remaining_balance: float
     generated_at: str  # Now stored as string (dd/mm/yyyy HH:MM:SS)
     report_file_url: Optional[str] = None  # Cloudinary file URL
+
+
+class ReportIdsRequest(BaseModel):
+    report_id: List[str]

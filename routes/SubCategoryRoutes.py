@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Query,Body
 from models.SubCategoryModel import SubCategory
 from controllers import SubCategoryController
+from pydantic import BaseModel
+from typing import List
 
 router = APIRouter()
 
@@ -32,6 +34,23 @@ async def get_sub_category_by_category_id(
 @router.delete("/deleteSubCategory/{subcategory_id}")
 async def delete_sub_category(subcategory_id: str):
     return await SubCategoryController.deleteSubCategory(subcategory_id)
+
+# Request body model for selected delete
+class SubCategoryDeleteRequest(BaseModel):
+    sub_category_ids: List[str]
+
+@router.post("/delete-selected-subcategories")
+async def delete_selected_sub_categories(payload: SubCategoryDeleteRequest):
+    return await SubCategoryController.deleteSelectedSubCategories(payload.sub_category_ids)
+
+
+# Delete all subcategories route
+@router.delete("/delete-all-subcategories")
+async def delete_all_sub_categories(
+    user_id: str = Query(..., description="User ID"),
+    role_id: str = Query(..., description="Role ID"),
+):
+    return await SubCategoryController.deleteAllSubCategories(user_id, role_id)
 
 @router.put("/editSubcategory/{sub_category_id}")
 async def update_subcategory(sub_category_id: str, update_data: dict = Body(...)):

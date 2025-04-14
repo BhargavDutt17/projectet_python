@@ -8,7 +8,7 @@ from config.database import (
 )
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from typing import Optional
+from typing import Optional , List
 
 
 async def addSubCategory(sub_category: SubCategory):
@@ -167,6 +167,57 @@ async def deleteSubCategory(subcategory_id: str):
         return {"message": "SubCategory deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting subcategory: {str(e)}")
+    
+
+# Delete selected subcategories by IDs
+async def deleteSelectedSubCategories(sub_category_ids: List[str]):
+    if not all(ObjectId.is_valid(sub_cat_id) for sub_cat_id in sub_category_ids):
+        raise HTTPException(status_code=400, detail="Invalid subcategory IDs")
+
+    object_ids = [ObjectId(sub_cat_id) for sub_cat_id in sub_category_ids]
+    result = await sub_category_collection.delete_many({"_id": {"$in": object_ids}})
+
+    if result.deleted_count > 0:
+        return JSONResponse(
+            content={"message": f"{result.deleted_count} subcategories deleted successfully"},
+            status_code=200,
+        )
+    else:
+        raise HTTPException(status_code=404, detail="No subcategories found to delete")
+
+
+# Delete all subcategories based on role
+async def deleteAllSubCategories(user_id: str, role_id: str):
+    if not user_id.strip() or not role_id.strip():
+        raise HTTPException(status_code=400, detail="Missing user_id or role_id")
+
+    # Fetch role to determine if it's admin
+    try:
+        role = await role_collection.find_one({"_id": ObjectId(role_id)})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid role_id: {e}")
+
+    if not role or "name" not in role:
+        raise HTTPException(status_code=400, detail="Invalid role_id")
+
+    role_name = role["name"].lower()
+
+    # Build query based on role
+    if role_name == "admin":
+        query = {"role_name": "admin"}
+    else:
+        query = {"user_id": user_id}  # Keep as string to match your DB
+
+    # Delete matching subcategories
+    result = await sub_category_collection.delete_many(query)
+
+    if result.deleted_count > 0:
+        return JSONResponse(
+            content={"message": f"{result.deleted_count} subcategories deleted successfully"},
+            status_code=200,
+        )
+    else:
+        raise HTTPException(status_code=404, detail="No subcategories found to delete")
 
 
 async def editSubCategory(sub_category_id: str, updated_data: dict):

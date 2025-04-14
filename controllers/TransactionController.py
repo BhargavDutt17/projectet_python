@@ -15,7 +15,8 @@ from controllers.TransactionReportController import (
     get_all_transaction_reports,
     delete_transaction_report,
     generate_transaction_report_for_admin,
-    delete_all_transaction_reports
+    delete_all_transaction_reports,
+    delete_selected_transaction_reports
 )
 from datetime import datetime
 
@@ -192,6 +193,55 @@ async def deleteTransaction(transaction_id: str, user_id: str = None):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting transaction: {str(e)}")
+    
+# Delete selected transactions by IDs
+async def delete_selected_transactions(transaction_ids: list, user_id: str = None):
+    try:
+        if not transaction_ids:
+            raise HTTPException(status_code=400, detail="No transaction IDs provided")
+
+        success_count = 0
+        for tx_id in transaction_ids:
+            try:
+                query = {"_id": ObjectId(tx_id)}
+                if user_id:
+                    query["user_id"] = user_id
+
+                result = await transactions_collection.delete_one(query)
+                if result.deleted_count:
+                    success_count += 1
+            except Exception as e:
+                print(f"Skipping transaction ID {tx_id} due to error: {e}")
+
+        return JSONResponse(
+            content={"message": f"{success_count} transaction(s) deleted successfully."},
+            status_code=200
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting selected transactions: {str(e)}")
+
+
+# Delete all transactions by user ID
+async def delete_all_transactions(user_id: str):
+    try:
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+
+        result = await transactions_collection.delete_many({"user_id": user_id})
+        # print(f"Deleting transactions for user_id: {user_id}")
+        # print(f"Type of user_id: {type(user_id)}")
+
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="No transactions found to delete")
+
+        return JSONResponse(
+            content={"message": f"{result.deleted_count} transaction(s) for user {user_id} deleted successfully."},
+            status_code=200
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting all transactions: {str(e)}")
 
 
 # Add Transaction Report Functions Inside TransactionController
@@ -224,6 +274,12 @@ async def getAllTransactionReports(user_id: str):
 async def deleteTransactionReport(report_id: str):
     # Call a properly defined function instead of itself
     return await delete_transaction_report(report_id)
+
+
+async def deleteSelectedTransactionReports(report_ids: list):
+    return await delete_selected_transaction_reports(report_ids)
+
+
 
 async def getTransactionsByUserSearch(query: str):
     try:

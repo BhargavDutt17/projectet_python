@@ -1,7 +1,8 @@
-from fastapi import APIRouter,Body
+from fastapi import APIRouter,Body,Query
 from models.TransactionModel import Transaction,TransactionUpdate
+from pydantic import BaseModel
 from controllers import TransactionController
-from typing import Optional
+from typing import Optional,List
 
 
 router = APIRouter()
@@ -80,6 +81,23 @@ async def delete_all_transaction_reports(user_id: str):
 async def delete_transaction(transaction_id: str, user_id: Optional[str] = None):
     return await TransactionController.deleteTransaction(transaction_id, user_id)
 
+# Pydantic model for selected delete
+class DeleteTransactionIds(BaseModel):
+    transaction_ids: List[str]
+
+# Delete selected transactions (POST) with optional user_id
+@router.post("/transactions/delete-selected")
+async def delete_selected_transactions_post(
+    payload: DeleteTransactionIds,
+    user_id: str = Query(None)  # <-- This is the only change
+):
+    return await TransactionController.delete_selected_transactions(payload.transaction_ids, user_id)
+
+# Delete all transactions for a user (DELETE)
+@router.delete("/all-transactions/{user_id}")
+async def delete_all_transactions_route(user_id: str):
+    return await TransactionController.delete_all_transactions(user_id)
+
 @router.put("/editTransaction/{transaction_id}")
 async def edit_transaction(
     transaction_id: str, 
@@ -92,5 +110,16 @@ async def edit_transaction(
 @router.get("/admin/getTransactionsByUserSearch")
 async def get_transactions_by_user_search(q: str):
     return await TransactionController.getTransactionsByUserSearch(q)
+
+class DeleteReportIds(BaseModel):
+    report_id: List[str]
+@router.post("/transaction-reports/delete-selected")
+async def delete_selected_transaction_reports_post(
+    payload: DeleteReportIds
+):
+    return await TransactionController.deleteSelectedTransactionReports(payload.report_id)
+
+
+
 
 

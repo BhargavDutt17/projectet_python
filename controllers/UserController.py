@@ -15,9 +15,11 @@ from controllers.UserReportController import (
     get_user_report_by_id,
     get_all_user_reports,
     delete_user_report,
-    delete_all_user_reports
+    delete_all_user_reports,
+    delete_selected_user_reports, 
 )
 import jwt
+from typing import List
 
 ADMIN_INVITE_CODE = "ADMIN123"
 scheduled_deletion_jobs, scheduled_deactivation_jobs = {}, {}
@@ -428,3 +430,6 @@ async def deleteUserReport(report_id: str):
 
 async def deletealluserreports():
     return await delete_all_user_reports()
+
+async def deleteSelectedUserReports(report_ids: List[str]):
+    return await delete_selected_user_reports(report_ids)

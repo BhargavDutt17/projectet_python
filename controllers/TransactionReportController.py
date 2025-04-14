@@ -4,7 +4,7 @@ import pytz
 from datetime import datetime
 from pymongo import ASCENDING
 from bson import ObjectId, errors
-from fastapi import HTTPException
+from fastapi import HTTPException,Body
 from fastapi.responses import StreamingResponse
 from config.database import (
     transactions_collection,
@@ -25,7 +25,7 @@ def auto_adjust_column_width(writer, df, sheet_name):
         worksheet.set_column(i, i, max_length)
 
 
-# ✅ Admin version: Generate report and return as downloadable Excel file
+# Admin version: Generate report and return as downloadable Excel file
 async def generate_transaction_report_for_admin(
     user_id: str,
     start_date: str = None,
@@ -117,8 +117,8 @@ async def generate_transaction_report_for_admin(
         raise HTTPException(status_code=500, detail=f"Error generating admin report: {str(e)}")
 
 
-# ✅ Existing: User report generation with Cloudinary upload
-# ✅ Updated: User report generation with Cloudinary upload (including public_id)
+# Existing: User report generation with Cloudinary upload
+# Updated: User report generation with Cloudinary upload (including public_id)
 async def generate_transaction_report(
     user_id: str,
     start_date: str = None,
@@ -243,7 +243,7 @@ async def generate_transaction_report(
         return {"error": f"Error generating report: {str(e)}"}
     
 
-# ✅ Other helper functions remain unchanged
+# Other helper functions remain unchanged
 async def get_latest_transaction_report(user_id: str):
     try:
         latest_report = await transaction_report_collection.find_one(
@@ -305,6 +305,27 @@ async def delete_transaction_report(report_id: str):
         raise http_exc
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+async def delete_selected_transaction_reports(report_ids: list):
+    try:
+        if not report_ids:
+            raise HTTPException(status_code=400, detail="No report IDs provided")
+
+        success_count = 0
+        for report_id in report_ids:
+            try:
+                await delete_transaction_report(report_id)
+                success_count += 1
+            except Exception as e:
+                print(f"Skipping report ID {report_id} due to error: {e}")
+
+        return {"message": f"{success_count} report(s) deleted successfully."}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting selected reports: {str(e)}")
+
+
     
 async def delete_all_transaction_reports(user_id: str):
     # Fetch all reports created by this specific user
@@ -313,7 +334,7 @@ async def delete_all_transaction_reports(user_id: str):
     for report in reports:
         public_id = report.get("public_id", "")
         if not public_id:
-            print(f"❌ No public_id found for the report")
+            print(f"No public_id found for the report")
             continue
 
         print(f"Attempting to delete Cloudinary public_id: {public_id}")
@@ -323,16 +344,16 @@ async def delete_all_transaction_reports(user_id: str):
             print(f"Cloudinary delete result: {result}")
 
             if result.get('result') != 'ok':
-                print(f"❌ Failed to delete file from Cloudinary: {result}")
+                print(f"Failed to delete file from Cloudinary: {result}")
             else:
-                print(f"✅ Successfully deleted file from Cloudinary")
+                print(f"Successfully deleted file from Cloudinary")
         except Exception as e:
             print(f"Error deleting from Cloudinary: {str(e)}")
 
         deleted = await transaction_report_collection.delete_one({"_id": report["_id"]})
         if deleted.deleted_count == 0:
-            print(f"❌ Failed to delete report from MongoDB")
+            print(f"Failed to delete report from MongoDB")
         else:
-            print(f"✅ Successfully deleted report from MongoDB")
+            print(f"Successfully deleted report from MongoDB")
 
     return {"message": f"{len(reports)} report(s) for user {user_id} deleted successfully"}

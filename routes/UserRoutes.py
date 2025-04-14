@@ -3,6 +3,7 @@ from controllers import UserController
 from models.UserModel import UserLogin, ResetPasswordReq
 from pydantic import BaseModel
 from config.database import user_collection
+from typing import List
 
 router = APIRouter()
 
@@ -134,6 +135,13 @@ async def get_all_user_excel_reports():
 @router.delete("/user-reports/{report_id}")
 async def delete_user_excel_report(report_id: str):
     return await UserController.deleteUserReport(report_id)
+
+class DeleteUserReportIds(BaseModel):
+    report_id: List[str]
+
+@router.post("/user-reports/delete-selected")
+async def delete_selected_user_excel_reports(payload: DeleteUserReportIds):
+    return await UserController.deleteSelectedUserReports(payload.report_id)
 
 
 def convert_objectid_to_str(user):

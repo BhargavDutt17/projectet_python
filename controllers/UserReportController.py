@@ -4,10 +4,11 @@ import io, pytz
 from datetime import datetime
 from fastapi import HTTPException
 from bson import ObjectId, errors
-from utils.CloudinaryUtil import upload_file_from_object
+from utils.CloudinaryUtil import upload_file_from_object,delete_file
 from fastapi import Request
 import re
-from cloudinary.uploader import destroy  
+from typing import Optional,List
+ 
 
 india_tz = pytz.timezone("Asia/Kolkata")
 
@@ -120,47 +121,73 @@ async def get_user_report_by_id(report_id: str):
 async def delete_user_report(report_id: str):
     try:
         report_obj_id = ObjectId(report_id)
+        report = await user_report_collection.find_one({"_id": report_obj_id})
+
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+
+        public_id = report.get("public_id")
+        if public_id:
+            result = await delete_file(public_id)  # or destroy(public_id) if not using async utils
+            if result.get("result") != "ok":
+                raise HTTPException(status_code=500, detail="Failed to delete file from Cloudinary")
+
+        deleted = await user_report_collection.delete_one({"_id": report_obj_id})
+        if deleted.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Failed to delete report from DB")
+
+        return {"message": "User report and associated file deleted successfully"}
+
     except errors.InvalidId:
         raise HTTPException(status_code=400, detail="Invalid report ID")
 
-    deleted = await user_report_collection.delete_one({"_id": report_obj_id})
-    if deleted.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Report not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+    
+async def delete_selected_user_reports(report_ids: List[str]):
+    try:
+        if not report_ids:
+            raise HTTPException(status_code=400, detail="No report IDs provided")
 
-    return {"message": "User report deleted successfully"}
+        success_count = 0
+        for report_id in report_ids:
+            try:
+                await delete_user_report(report_id)
+                success_count += 1
+            except Exception as e:
+                print(f"Skipping report ID {report_id} due to error: {e}")
 
-from cloudinary.uploader import destroy
+        return {"message": f"{success_count} report(s) deleted successfully."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting selected reports: {str(e)}")
 
 async def delete_all_user_reports():
     reports = await user_report_collection.find().to_list(None)
 
     for report in reports:
-        file_url = report.get("report_file_url", "")
-        public_id = report.get("public_id", "")  # Ensure we're getting the correct public_id
-
+        public_id = report.get("public_id", "")
         if not public_id:
-            print(f"❌ No public_id found for the report")
+            print(f"No public_id found for report ID: {report.get('_id')}")
             continue
 
         print(f"Attempting to delete Cloudinary public_id: {public_id}")
 
         try:
-            # Delete the file from Cloudinary using the exact public_id stored
-            result = destroy(public_id, resource_type="raw")  # Ensure resource_type is 'raw'
+            result = await delete_file(public_id, resource_type="raw")  # Await this!
             print(f"Cloudinary delete result: {result}")
 
-            if result.get('result') != 'ok':
-                print(f"❌ Failed to delete file from Cloudinary: {result}")
+            if result.get("result") != "ok":
+                print(f"Failed to delete from Cloudinary: {result}")
             else:
-                print(f"✅ Successfully deleted file from Cloudinary")
+                print(f"Successfully deleted from Cloudinary")
         except Exception as e:
             print(f"Error deleting from Cloudinary: {str(e)}")
 
-        # Delete the report entry from DB
         deleted = await user_report_collection.delete_one({"_id": report["_id"]})
         if deleted.deleted_count == 0:
-            print(f"❌ Failed to delete report from MongoDB")
+            print(f"Failed to delete report from MongoDB")
         else:
-            print(f"✅ Successfully deleted report from MongoDB")
+            print(f"Successfully deleted report from MongoDB")
 
     return {"message": f"{len(reports)} report(s) deleted successfully"}

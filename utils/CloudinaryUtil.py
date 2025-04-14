@@ -57,10 +57,12 @@ async def upload_file_from_object(file_stream, file_name, file_format="xlsx"):
         "public_id": result["public_id"]
     }
 
-async def delete_file(public_id: str):
+async def delete_file(public_id: str, resource_type: str = "raw"):
     try:
-        result = destroy(public_id, resource_type="raw")
+        # If using sync Cloudinary SDK in async context, wrap it with asyncio.to_thread
+        import asyncio
+        result = await asyncio.to_thread(destroy, public_id, resource_type=resource_type)
         return result
     except Exception as e:
-        print(f"Error deleting file: {e}")
-        return None
+        print(f"Cloudinary delete error: {e}")
+        return {"result": "error", "message": str(e)}
