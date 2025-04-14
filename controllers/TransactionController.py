@@ -247,3 +247,4 @@ async def getTransactionsByUserSearch(query: str):
 
 async def deletealltransactionreports(user_id: str):
     return await delete_all_transaction_reports(user_id)
+

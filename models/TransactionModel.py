@@ -58,3 +58,4 @@ class TransactionOut(Transaction):
                 if isinstance(value, ObjectId):
                     v[key] = str(value)
             return v
+

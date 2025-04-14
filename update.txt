@@ -25,3 +25,6 @@ and edit and delete for catgeory and transaction is added
 
 08-04-2025
 add delete and deactivate users with cronjobs
+
+14-04-2025
+project is complete some minor function is remains.

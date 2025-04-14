@@ -102,8 +102,8 @@ async def getAllSubCategories(user_id: str = None, role_id: str = None):
 async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = None, role_id: Optional[str] = None):
     try:
         filters = {}
-
         role_name = "user"
+
         if role_id:
             role = await role_collection.find_one({"_id": ObjectId(role_id)})
             if role:
@@ -120,7 +120,16 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
                     {"role_name": "admin"}
                 ]
         else:
-            filters["category_id"] = category_id
+            if role_name == "admin":
+                filters = {
+                    "category_id": category_id,
+                    "role_name": "admin"
+                }
+            else:
+                filters["$or"] = [
+                    {"category_id": category_id, "user_id": user_id},
+                    {"category_id": category_id, "role_name": "admin"},
+                ]
 
         subCategories = await sub_category_collection.find(filters).to_list(None)
 
@@ -147,6 +156,7 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching subcategories: {str(e)}")
+
 
 
 async def deleteSubCategory(subcategory_id: str):
