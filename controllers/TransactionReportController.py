@@ -104,7 +104,7 @@ async def generate_transaction_report_for_admin(
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
             auto_adjust_column_width(writer, transaction_df, "UserReport")
             auto_adjust_column_width(writer, summary_df, "Summary")
-            writer.close()
+            # writer.close()
 
         output.seek(0)
         file_name = f"{username}_Report_{date_range_label}.xlsx"
@@ -212,7 +212,7 @@ async def generate_transaction_report(
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
             auto_adjust_column_width(writer, transaction_df, "UserReport")
             auto_adjust_column_width(writer, summary_df, "Summary")
-            writer.close()
+            # writer.close()
 
         output.seek(0)
         cloudinary_result = await upload_file_from_object(output, file_name, "xlsx")

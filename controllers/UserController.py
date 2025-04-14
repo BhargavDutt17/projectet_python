@@ -20,6 +20,11 @@ from controllers.UserReportController import (
 )
 import jwt
 from typing import List
+import asyncio
+import threading
+
+# Capture the main FastAPI event loop once at startup
+MAIN_LOOP = asyncio.get_event_loop()
 
 ADMIN_INVITE_CODE = "ADMIN123"
 scheduled_deletion_jobs, scheduled_deactivation_jobs = {}, {}
@@ -130,24 +135,6 @@ async def update_profile_picture(user_id, image: UploadFile):
         "profile_image": image_info["secure_url"]
     }
 
-async def delete_profile_picture(user_id: str):
-    user = await user_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    public_id = user.get("public_id")
-    if public_id:
-        await delete_image(public_id)  # Deletes from Cloudinary
-
-    # Remove profile image fields from DB
-    await user_collection.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$unset": {"profile_image": "", "public_id": ""}}
-    )
-
-    return {"message": "Profile picture deleted successfully"}
-
-
 async def uploadUserProfileImage(user_id, image: UploadFile):
     user = await user_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
@@ -233,6 +220,22 @@ async def change_password(user_id, current_password, new_password, confirm_passw
     return {"message": "Password updated successfully"}
 
 # -------------------------- DEACTIVATE / DELETE -------------------------- #
+async def delete_profile_picture(user_id: str):
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    public_id = user.get("public_id")
+    if public_id:
+        await delete_image(public_id)  # Deletes from Cloudinary
+
+    # Remove profile image fields from DB
+    await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$unset": {"profile_image": "", "public_id": ""}}
+    )
+
+    return {"message": "Profile picture deleted successfully"}
 
 async def trigger_user_deactivation(user_id, role, password=None):
     user = await user_collection.find_one({"_id": ObjectId(user_id)})
@@ -281,28 +284,44 @@ async def activateUser(request: UserLogin):
 # -------------------------- SCHEDULERS -------------------------- #
 
 def schedule_deactivate(user_id):
-    _schedule(user_id, deactivate_user, 2, scheduled_deactivation_jobs)
+    _schedule(user_id, deactivate_user, 1, scheduled_deactivation_jobs)
 
 
 def schedule_delete(user_id, email):
-    _schedule(user_id, lambda: delete_user(user_id, email), 3, scheduled_deletion_jobs)
+    _schedule(user_id, lambda *args, **kwargs: delete_user(user_id, email), 1, scheduled_deletion_jobs)
 
 
 def schedule_admin_deactivate(user_id):
-    _schedule(user_id, deactivate_user, 2, admin_scheduled_deactivation_jobs)
+    _schedule(user_id, deactivate_user, 1, admin_scheduled_deactivation_jobs)
 
 
 def schedule_admin_delete(user_id, email):
-    _schedule(user_id, lambda: delete_user(user_id, email), 3, admin_scheduled_deletion_jobs)
+    _schedule(user_id, lambda *args, **kwargs: delete_user(user_id, email), 1, admin_scheduled_deletion_jobs)
+
+
+def run_async_task(task, user_id):
+    # Submit task to the main loop using thread-safe method
+    if MAIN_LOOP.is_running():
+        MAIN_LOOP.call_soon_threadsafe(lambda: asyncio.create_task(task(user_id)))
+    else:
+        # If for some reason main loop is not running (fallback)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(task(user_id))
+        loop.close()
+
 
 
 def _schedule(user_id, task, minutes, job_dict):
-    loop = asyncio.get_event_loop()
     if user_id in job_dict:
-        try: job_dict[user_id].remove()
-        except: pass
+        try:
+            job_dict[user_id].remove()
+        except:
+            pass
         job_dict.pop(user_id, None)
-    job = scheduler.add_job(lambda: loop.create_task(task(user_id)), trigger="date", run_date=datetime.now() + timedelta(minutes=minutes))
+
+    run_time = datetime.now() + timedelta(minutes=minutes)
+    job = scheduler.add_job(run_async_task, args=[task, user_id], trigger="date", run_date=run_time)
     job_dict[user_id] = job
 
 
