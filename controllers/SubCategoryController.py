@@ -44,52 +44,55 @@ async def addSubCategory(sub_category: SubCategory):
 async def getAllSubCategories(user_id: str = None, role_id: str = None):
     try:
         query = {}
-
         role_name = "user"
+
+        # Determine role_name from role_id
         if role_id:
             role = await role_collection.find_one({"_id": ObjectId(role_id)})
             if role:
                 role_name = role["name"].lower()
             else:
                 raise HTTPException(status_code=400, detail="Invalid role_id provided")
+            print(f"Role: {role_name}, User ID: {user_id}, Query: {query}")
 
+        # Validate user_id if not admin
+        if role_name != "admin" and not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required for non-admin users")
+
+        # Build query based on role
         if role_name == "admin":
             query["role_name"] = "admin"
         else:
-            query["user_id"] = ObjectId(user_id)
+            query = {
+                "user_id": user_id,
+                "role_name": "user"
+            }
+            print(f"Query being executed: {query}")
+
 
         subCategories = await sub_category_collection.find(query).to_list(None)
+        print(f"Fetched subCategories: {subCategories}")  # Log fetched data
+
 
         for subCat in subCategories:
             subCat["_id"] = str(subCat["_id"])
-            subCat["user_id"] = (
-                str(subCat["user_id"]) if subCat.get("user_id") else None
-            )
+            subCat["user_id"] = str(subCat["user_id"]) if subCat.get("user_id") else None
             subCat["category_id"] = str(subCat["category_id"])
 
-            user = (
-                await user_collection.find_one({"_id": ObjectId(subCat["user_id"])})
-                if subCat["user_id"]
-                else None
-            )
+            user = await user_collection.find_one({"_id": ObjectId(subCat["user_id"])}) if subCat["user_id"] else None
             subCat["user_id"] = user if user else None
 
-            category = await category_collection.find_one(
-                {"_id": ObjectId(subCat["category_id"])}
-            )
+            category = await category_collection.find_one({"_id": ObjectId(subCat["category_id"])})
             subCat["category_id"] = category if category else None
 
             if subCat.get("role_id"):
-                role = await role_collection.find_one(
-                    {"_id": ObjectId(subCat["role_id"])}
-                )
-                subCat["role_id"] = (
-                    {"_id": str(role["_id"]), "name": role["name"]} if role else None
-                )
+                role = await role_collection.find_one({"_id": ObjectId(subCat["role_id"])})
+                subCat["role_id"] = {"_id": str(role["_id"]), "name": role["name"]} if role else None
             else:
                 subCat["role_id"] = None
 
             subCat["role_name"] = subCat.get("role_name", "user")
+            
 
         return [SubCategoryOut(**subCat) for subCat in subCategories]
 
@@ -115,10 +118,11 @@ async def getSubCategoryByCategoryId(category_id: str, user_id: Optional[str] = 
             if role_name == "admin":
                 filters["role_name"] = "admin"
             else:
-                filters["$or"] = [
-                    {"user_id": user_id},
-                    {"role_name": "admin"}
-                ]
+                filters = {
+            "user_id": ObjectId(user_id),
+            "role_name": "user"
+            }
+
         else:
             if role_name == "admin":
                 filters = {
