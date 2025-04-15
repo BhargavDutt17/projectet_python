@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form, UploadFile, File,Request,HTTPException
 from controllers import UserController
 from models.UserModel import UserLogin, ResetPasswordReq
-from pydantic import BaseModel
+from pydantic import BaseModel,EmailStr
 from config.database import user_collection
 from typing import List
 
@@ -44,8 +44,6 @@ async def get_user_profile(user_id: str):
 class UpdateUsernameModel(BaseModel):
     new_username: str
 
-class UpdateEmailModel(BaseModel):
-    new_email: str
 
 class UpdatePasswordModel(BaseModel):
     current_password: str
@@ -58,10 +56,13 @@ class UpdatePasswordModel(BaseModel):
 async def update_user_username(user_id: str, data: UpdateUsernameModel):
     return await UserController.update_username(user_id, data.new_username)
 
-# Route to update email (Now Accepts JSON)
+class UpdateEmailModel(BaseModel):
+    new_email: EmailStr
+
 @router.put("/update-email/{user_id}")
 async def update_user_email(user_id: str, data: UpdateEmailModel):
     return await UserController.update_email(user_id, data.new_email)
+
 
 # Route to change password (Now Accepts JSON)
 @router.put("/change-password/{user_id}")

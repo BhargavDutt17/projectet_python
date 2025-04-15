@@ -201,11 +201,18 @@ async def update_username(user_id, new_username):
     await user_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"username": new_username}})
     return {"message": "Username updated successfully"}
 
+async def update_email(user_id: str, new_email: str):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
 
-async def update_email(user_id, new_email):
-    if await user_collection.find_one({"email": new_email}):
-        raise HTTPException(status_code=400, detail="Email already in use")
-    await user_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"email": new_email}})
+    result = await user_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"email": new_email}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Email not updated")
+
     return {"message": "Email updated successfully"}
 
 
