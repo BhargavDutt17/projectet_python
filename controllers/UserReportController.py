@@ -39,7 +39,7 @@ async def generate_user_report(request: Request):
                 if role:
                     role_name = role.get("name", "N/A")
 
-            # ✅ Apply filters
+            # Apply filters
             if selected_role != "all" and role_name != selected_role:
                 continue
             if selected_status != "all" and user.get("status") != selected_status:
