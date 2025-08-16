@@ -8,8 +8,8 @@ from email import encoders
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_EMAIL ="duttbhargav17@gmail.com"
-SMTP_PASSWORD="vbte zpgz exen wdto"
+SMTP_EMAIL =""
+SMTP_PASSWORD=""
 
 def send_mail(to_email:str,subject:str,text:str):
     msg = MIMEMultipart()
@@ -27,4 +27,4 @@ def send_mail(to_email:str,subject:str,text:str):
     
     return {"message":"Mail sent successfully"}
 
-#send_mail("samir.vithlani83955@gmail.com","Test Mail","This is a test mail from fast...")
+#send_mail("Test Mail","This is a test mail from fast...")
