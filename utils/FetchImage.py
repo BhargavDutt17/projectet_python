@@ -1,9 +1,8 @@
 import os
 import requests
 
-# SERP_API_KEY = "013f93b01d3a36390f89f7aa0f4cf22fa997ed5edbd004adebf9e4a46bac0599"  # 🔹 Replace with your actual SerpAPI key
+SERP_API_KEY = ""  # 🔹 Replace with your actual SerpAPI key
 
-SERP_API_KEY = "1a2a428d4e212cddfaeebeb833df0fab0cbd63b8dfafd1bd3572fd7058990160" 
 def fetch_image_url(query):
     """
     Fetches the first image URL from Google Images using SerpAPI.
