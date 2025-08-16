@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 # Cloudinary Configuration
 cloudinary.config(
-    cloud_name="dvpsq8fur",
+    cloud_name="",
     api_key="",
     api_secret="",
 )
