@@ -6,8 +6,8 @@ from fastapi import HTTPException
 # Cloudinary Configuration
 cloudinary.config(
     cloud_name="dvpsq8fur",
-    api_key="844355169722191",
-    api_secret="g9ZHUl_13Mn3-XjaWvNiMdUVZdo",
+    api_key="",
+    api_secret="",
 )
 
 
